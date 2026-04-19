@@ -584,6 +584,12 @@ function Calendar({rows}) {
   const [yr,setYr]=useState(TODAY.getFullYear());
   const [mo,setMo]=useState(TODAY.getMonth());
   const [sel,setSel]=useState(null);
+  const [isMobile,setIsMobile]=useState(typeof window!=="undefined"&&window.innerWidth<768);
+  useEffect(()=>{
+    const h=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",h);
+    return()=>window.removeEventListener("resize",h);
+  },[]);
   const first=new Date(yr,mo,1).getDay(),dim=new Date(yr,mo+1,0).getDate();
   const weeks=[];let d=1-first;
   while(d<=dim){const w=[];for(let i=0;i<7;i++,d++)w.push(d>0&&d<=dim?d:null);weeks.push(w);}
@@ -598,7 +604,7 @@ function Calendar({rows}) {
   const nM=()=>{mo===11?(setMo(0),setYr(y=>y+1)):setMo(m=>m+1);setSel(null);};
   const sev=sel?evMap[sel]||{s:[],r:[]}:{s:[],r:[]};
   return(
-    <div style={{display:"grid",gridTemplateColumns:"1fr 290px",gap:18}}>
+    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 290px",gap:isMobile?12:18}}>
       <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:"1px solid #f1f5f9"}}>
           <button onClick={pM} style={{background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",cursor:"pointer"}}>‹</button>
@@ -620,15 +626,15 @@ function Calendar({rows}) {
               const isT=d&&yr===TODAY.getFullYear()&&mo===TODAY.getMonth()&&d===TODAY.getDate();
               const ev=d?evMap[d]||{s:[],r:[]}:{s:[],r:[]};
               return<div key={di} onClick={()=>d&&setSel(d===sel?null:d)}
-                style={{minHeight:84,padding:"6px 5px",borderLeft:di>0?"1px solid #f1f5f9":"none",background:d===sel?"#eff6ff":"transparent",cursor:d?"pointer":"default"}}>
+                style={{minHeight:isMobile?92:118,padding:"6px 5px",borderLeft:di>0?"1px solid #f1f5f9":"none",background:d===sel?"#eff6ff":"transparent",cursor:d?"pointer":"default"}}>
                 {d&&<>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                     <div style={{width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isT?"#1d4ed8":"transparent",color:isT?"#fff":di===0?"#ef4444":di===6?"#3b82f6":"#1e293b",fontSize:12,fontWeight:isT?700:400}}>{d}</div>
                     <div style={{display:"flex",gap:2}}>{ev.s.length>0&&<div style={{width:7,height:7,borderRadius:"50%",background:"#3b82f6"}}/>}{ev.r.length>0&&<div style={{width:7,height:7,borderRadius:"50%",background:"#f97316"}}/>}</div>
                   </div>
-                  {ev.s.slice(0,1).map(r=><div key={`s${r.id}`} style={{fontSize:9,padding:"2px 4px",borderRadius:3,background:"#dbeafe",color:"#1d4ed8",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:1}}>🔵 {r.학교명}</div>)}
-                  {ev.r.slice(0,1).map(r=><div key={`r${r.id}`} style={{fontSize:9,padding:"2px 4px",borderRadius:3,background:"#ffedd5",color:"#c2410c",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:1}}>🟠 {r.학교명}</div>)}
-                  {(ev.s.length+ev.r.length)>2&&<div style={{fontSize:9,color:"#94a3b8"}}>+{ev.s.length+ev.r.length-2}건</div>}
+                  {ev.s.slice(0,2).map(r=><div key={`s${r.id}`} style={{fontSize:9,padding:"2px 4px",borderRadius:3,background:"#dbeafe",color:"#1d4ed8",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:1}}>🔵 {r.학교명}</div>)}
+                  {ev.r.slice(0,2).map(r=><div key={`r${r.id}`} style={{fontSize:9,padding:"2px 4px",borderRadius:3,background:"#ffedd5",color:"#c2410c",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:1}}>🟠 {r.학교명}</div>)}
+                  {(ev.s.length+ev.r.length)>4&&<div style={{fontSize:9,color:"#94a3b8"}}>+{ev.s.length+ev.r.length-4}건</div>}
                 </>}
               </div>;
             })}
@@ -672,6 +678,12 @@ function Chat({user,members}) {
   const [msgs,setMsgs]=useState([]);
   const [input,setInput]=useState("");
   const [room,setRoom]=useState("전체");
+  const [isMobile,setIsMobile]=useState(typeof window!=="undefined"&&window.innerWidth<768);
+  useEffect(()=>{
+    const h=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",h);
+    return()=>window.removeEventListener("resize",h);
+  },[]);
   const bottomRef=useRef();
   const rooms=["전체","현장조사","보고서작성","공지사항"];
   const rColors={전체:"#1d4ed8",현장조사:"#16a34a",보고서작성:"#7c3aed",공지사항:"#dc2626"};
@@ -690,8 +702,8 @@ function Chat({user,members}) {
   const grouped=[];let lastDate=null;
   msgs.forEach(m=>{if(m.date!==lastDate){grouped.push({type:"date",date:m.date});lastDate=m.date;}grouped.push({type:"msg",...m});});
   return(
-    <div style={{display:"grid",gridTemplateColumns:"170px 1fr",gap:16,height:"calc(100vh - 160px)"}}>
-      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",padding:12,display:"flex",flexDirection:"column",gap:4}}>
+    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"170px 1fr",gap:16,height:"calc(100vh - 160px)"}}>
+      {!isMobile&&<div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",padding:12,display:"flex",flexDirection:"column",gap:4}}>
         <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:6,padding:"0 4px"}}>채팅방</div>
         {rooms.map(r=><button key={r} onClick={()=>setRoom(r)} style={{padding:"9px 10px",borderRadius:10,border:"none",cursor:"pointer",textAlign:"left",fontWeight:room===r?700:500,fontSize:13,background:room===r?`${rColors[r]}18`:"transparent",color:room===r?rColors[r]:"#475569",display:"flex",alignItems:"center",gap:8}}><span style={{width:7,height:7,borderRadius:"50%",background:rColors[r],flexShrink:0}}/>{r}</button>)}
         <div style={{marginTop:"auto",padding:"10px 4px",borderTop:"1px solid #f1f5f9"}}>
@@ -700,8 +712,14 @@ function Chat({user,members}) {
             <div><div style={{fontSize:11,fontWeight:700}}>{user.name}</div><div style={{fontSize:9,color:user.role==="admin"?"#f97316":"#22c55e"}}>● {user.role==="admin"?"관리자":"팀원"}</div></div>
           </div>
         </div>
-      </div>
+      </div>}
       <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        {isMobile&&<div style={{display:"flex",gap:6,padding:"10px 12px",borderBottom:"1px solid #f1f5f9",overflowX:"auto",scrollbarWidth:"none"}}>
+          {rooms.map(r=><button key={r} onClick={()=>setRoom(r)}
+            style={{padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:room===r?rColors[r]:"#e5e7eb",background:room===r?`${rColors[r]}15`:"#fff",color:room===r?rColors[r]:"#64748b",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,flexShrink:0,fontFamily:"inherit"}}>
+            <span style={{width:7,height:7,borderRadius:"50%",background:rColors[r]}}/>{r}
+          </button>)}
+        </div>}
         <div style={{padding:"12px 18px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",gap:8,background:`${rColors[room]}08`}}>
           <span style={{width:9,height:9,borderRadius:"50%",background:rColors[room]}}/><span style={{fontWeight:700,fontSize:14}}>{room}</span>
           <span style={{fontSize:11,color:"#94a3b8",marginLeft:4}}>{msgs.length}개 메시지</span>
