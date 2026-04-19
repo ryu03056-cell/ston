@@ -808,25 +808,27 @@ function App() {
 
     // 설정 로드
     db.ref("settings").on("value", snap=>{
-      const s=snap.val();
-      if(s){
-        if(s.adminPw) { setAdminPw(s.adminPw); window._adminPw = s.adminPw; }
-        if(s.members) setMembers(s.members);
-      }
-    });
+  const s=snap.val();
+  if(s){
+    if(s.adminPw) {
+      setAdminPw(s.adminPw);
+      window._adminPw = s.adminPw;
+    }
+    if(s.members) setMembers(s.members);
+  }
+  setReady(true);
+});
 
-    // 현장 데이터 로드
-    db.ref("rows").on("value", snap=>{
-      clearTimeout(fallback);
-      const data=snap.val();
-      if(data){
-        setRows(Object.values(data).sort((a,b)=>a.no-b.no));
-      } else {
-        fbSetRows(INIT_ROWS);
-        setRows(INIT_ROWS);
-      }
-      setReady(true);
-    });
+// 현장 데이터 로드
+db.ref("rows").on("value", snap=>{
+  const data=snap.val();
+  if(data){
+    setRows(Object.values(data).sort((a,b)=>a.no-b.no));
+  } else {
+    fbSetRows(INIT_ROWS);
+    setRows(INIT_ROWS);
+  }
+});
 
     return()=>{
       db.ref("settings").off();
