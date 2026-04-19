@@ -4,25 +4,17 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>현장조사팀 대시보드</title>
-
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-<!-- React & Babel -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-<!-- Excel 업로드 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',sans-serif}
+  body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
   button,input,select{font-family:inherit}
   ::-webkit-scrollbar{width:6px;height:6px}
-  ::-webkit-scrollbar-track{background:#f1f5f9}
   ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
 </style>
 </head>
@@ -30,92 +22,71 @@
 <div id="root"></div>
 
 <script>
-/* ============================================================
-   🔥 Firebase 설정 — 아래 내용을 본인 설정으로 교체하세요!
-   Firebase 콘솔 → 프로젝트 설정 → 웹 앱 → SDK 설정에서 복사
-   ============================================================ */
+/* =====================================================
+   🔥 여기에 본인 Firebase 설정 붙여넣기
+   ===================================================== */
 const firebaseConfig = {
   apiKey: "AIzaSyCkYznuSYHcnvVHhmrnh6oj2ad55OHjLHQ",
   authDomain: "stoneng-3team.firebaseapp.com",
-  databaseURL: "https://stoneng-3team-default-rtdb.firebaseio.com/",
+  databaseURL: "https://stoneng-3team-default-rtdb.firebaseio.com",
   projectId: "stoneng-3team",
   storageBucket: "stoneng-3team.firebasestorage.app",
   messagingSenderId: "933097103151",
   appId: "1:933097103151:web:9459005d7bff91c57f8bda"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 </script>
 
 <script type="text/babel">
-const {useState, useRef, useEffect, useCallback} = React;
+const {useState, useRef, useEffect} = React;
 
-/* ── 상수 ── */
-const DEFAULT_ADMIN_PW = "admin1234";
+const ADMIN_PW_DEFAULT = "981105";
 const DEFAULT_MEMBERS  = ["김민준","이서연","박지호","최유나","정다은"];
-const STEPS_SHORT = ["현장조사","부록작성","엑셀","워드","PDF","제본"];
-const STEPS_FULL  = ["현장조사","기타자료 및 부록작성","엑셀작성","워드작성","PDF작성","제본"];
-const TODAY = new Date();
+const STEPS = ["현장조사","부록작성","엑셀","워드","PDF","제본"];
+const TODAY  = new Date();
 
-const INIT_ROWS = [
-  {id:"r1",no:1,점검종류:"내진성능",지역:"시흥",학교명:"시흥경찰서",시설명:"민물소",동수:2,연면적:235.52,현장조사:"2026-02-24",착수일:"2026-01-20",완수일:"2026-04-20",FMS:"",특기사항:"",납품방법:"현장납품",lead:"김민준",progress:5,status:"완료",계약금액:1850000,현장참여:["김민준","이서연"]},
-  {id:"r2",no:2,점검종류:"구조금리",지역:"양평",학교명:"동문고등학교",시설명:"고식C동",동수:4,연면적:1317,현장조사:"",착수일:"2026-01-27",완수일:"2026-03-27",FMS:"",특기사항:"",납품방법:"택배납품",lead:"이서연",progress:2,status:"작성중",계약금액:4200000,현장참여:[]},
-  {id:"r3",no:3,점검종류:"내진성능",지역:"김포",학교명:"동진학교",시설명:"별관동",동수:4,연면적:1947.24,현장조사:"",착수일:"2026-01-27",완수일:"2026-03-27",FMS:"",특기사항:"압류",납품방법:"현장납품",lead:"박지호",progress:1,status:"지연",계약금액:5500000,현장참여:[]},
-  {id:"r4",no:4,점검종류:"내진성능",지역:"김포",학교명:"동진학교",시설명:"급식소",동수:2,연면적:924.85,현장조사:"",착수일:"2026-01-27",완수일:"2026-03-27",FMS:"",특기사항:"",납품방법:"현장납품",lead:"박지호",progress:1,status:"지연",계약금액:2800000,현장참여:[]},
-  {id:"r5",no:5,점검종류:"시설안전",지역:"서울",학교명:"북한산고등학교",시설명:"본관",동수:5,연면적:15800,현장조사:"2026-04-17",착수일:"2026-04-17",완수일:"2026-04-25",FMS:"A123/pw1234",특기사항:"소방시설 노후화",납품방법:"택배납품",lead:"최유나",progress:3,status:"작성중",계약금액:12000000,현장참여:["최유나","박지호"]},
-  {id:"r6",no:6,점검종류:"소방시설",지역:"서울",학교명:"도림초등학교",시설명:"교사동",동수:3,연면적:7800,현장조사:"2026-04-25",착수일:"2026-04-25",완수일:"2026-05-06",FMS:"",특기사항:"석면 자재 존재",납품방법:"현장납품",lead:"정다은",progress:0,status:"예정",계약금액:3300000,현장참여:[]},
-];
-
-/* ── 유틸 ── */
+/* ── 컬러 ── */
 const MC = {김민준:"#3b82f6",이서연:"#8b5cf6",박지호:"#f59e0b",최유나:"#10b981",정다은:"#ef4444",관리자:"#0f172a"};
-const XC = ["#3b82f6","#8b5cf6","#f59e0b","#10b981","#ef4444","#06b6d4","#ec4899","#14b8a6"];
-const SS = {완료:{bg:"#dcfce7",color:"#16a34a"},진행중:{bg:"#dbeafe",color:"#1d4ed8"},예정:{bg:"#f3f4f6",color:"#6b7280"},지연:{bg:"#fee2e2",color:"#dc2626"},작성중:{bg:"#ede9fe",color:"#7c3aed"}};
+const XC = ["#3b82f6","#8b5cf6","#f59e0b","#10b981","#ef4444","#06b6d4"];
+const SS = {완료:{bg:"#dcfce7",c:"#16a34a"},진행중:{bg:"#dbeafe",c:"#1d4ed8"},예정:{bg:"#f3f4f6",c:"#6b7280"},지연:{bg:"#fee2e2",c:"#dc2626"},작성중:{bg:"#ede9fe",c:"#7c3aed"}};
 
-const diffDays = d => { if(!d) return null; return Math.round((new Date(d)-TODAY)/86400000); };
-const dLabel   = d => { if(d===null)return"-"; if(d<0)return`D+${Math.abs(d)}`; return`D-${d}`; };
-const urgColor = d => {
-  if(d===null)return{bg:"#f1f5f9",color:"#94a3b8"};
-  if(d<0)return{bg:"#fee2e2",color:"#dc2626"};
-  if(d<=3)return{bg:"#fff1f2",color:"#e11d48"};
-  if(d<=7)return{bg:"#fff7ed",color:"#ea580c"};
-  if(d<=14)return{bg:"#fefce8",color:"#ca8a04"};
-  return{bg:"#f0fdf4",color:"#16a34a"};
-};
-const won  = n => n ? `${n.toLocaleString()}원` : "-";
-const mColor = (name, idx) => MC[name] || XC[idx % XC.length] || "#1d4ed8";
+const diffDays = d => !d ? null : Math.round((new Date(d)-TODAY)/86400000);
+const dLabel   = d => d===null?"-":d<0?`D+${Math.abs(d)}`:`D-${d}`;
+const urgBg    = d => d===null?"#f1f5f9":d<0?"#fee2e2":d<=3?"#fff1f2":d<=7?"#fff7ed":d<=14?"#fefce8":"#f0fdf4";
+const urgC     = d => d===null?"#94a3b8":d<0?"#dc2626":d<=3?"#e11d48":d<=7?"#ea580c":d<=14?"#ca8a04":"#16a34a";
+const mColor   = (name,i) => MC[name]||XC[i%XC.length]||"#1d4ed8";
+const won      = n => n?`${n.toLocaleString()}원`:"-";
 
-/* ── Firebase helpers ── */
-const fbSetRows = rows => {
-  const obj = {};
-  rows.forEach(r => { obj[r.id] = r; });
+/* ── Firebase 쓰기 ── */
+const fbRows = rows => {
+  const obj={};
+  rows.forEach(r=>{obj[r.id]=r;});
   db.ref("rows").set(obj);
 };
-const fbSetSettings = (key, value) => db.ref(`settings/${key}`).set(value);
+const fbSettings = (k,v) => db.ref(`settings/${k}`).set(v);
 
-/* ── 공통 컴포넌트 ── */
-const Badge = ({label,s}) => <span style={{background:s.bg,color:s.color,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>;
+/* ── 공통 UI ── */
+const Bdg = ({label,bg,c}) => <span style={{background:bg,color:c,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>;
+const Av  = ({name,size=26,idx=0}) => <div title={name} style={{width:size,height:size,borderRadius:"50%",background:mColor(name,idx),color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.38,fontWeight:700,flexShrink:0,border:"2px solid #fff"}}>{name?name[0]:"?"}</div>;
 
-const Av = ({name, size=26, color}) => {
-  const bg = color || MC[name] || "#1d4ed8";
-  return <div title={name} style={{width:size,height:size,borderRadius:"50%",background:bg,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.38,fontWeight:700,flexShrink:0,border:"2px solid #fff"}}>{name?name[0]:"?"}</div>;
-};
-
-const PBar = ({step, compact}) => {
-  const t = 6;
-  if(compact) return (
+/* ── 진행바 ── */
+const PBar = ({step,compact}) => {
+  if(compact) return(
     <div style={{minWidth:130}}>
-      <div style={{display:"flex",gap:2,marginBottom:2}}>{STEPS_SHORT.map((_,i)=><div key={i} style={{flex:1,height:5,borderRadius:3,background:i<step?(step===t?"#16a34a":"#3b82f6"):"#e5e7eb"}}/>)}</div>
-      <div style={{fontSize:10,color:"#64748b"}}>{step===0?"미착수":step===t?"✅ 완료":`${STEPS_SHORT[step-1]} 완료 (${step}/${t})`}</div>
+      <div style={{display:"flex",gap:2,marginBottom:2}}>
+        {STEPS.map((_,i)=><div key={i} style={{flex:1,height:5,borderRadius:3,background:i<step?(step===6?"#16a34a":"#3b82f6"):"#e5e7eb"}}/>)}
+      </div>
+      <div style={{fontSize:10,color:"#64748b"}}>{step===0?"미착수":step===6?"✅ 완료":`${STEPS[step-1]} 완료 (${step}/6)`}</div>
     </div>
   );
-  return (
+  return(
     <div style={{display:"flex"}}>
-      {STEPS_FULL.map((s,i)=>{
-        const done=i<step, active=i===step&&step<t;
+      {STEPS.map((s,i)=>{
+        const done=i<step,active=i===step&&step<6;
         return <div key={s} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",position:"relative"}}>
           {i>0&&<div style={{position:"absolute",top:11,left:"-50%",right:"50%",height:2,background:done?"#3b82f6":"#e5e7eb",zIndex:0}}/>}
-          <div style={{width:24,height:24,borderRadius:"50%",zIndex:1,position:"relative",background:done?(step===t?"#16a34a":"#3b82f6"):active?"#bfdbfe":"#f1f5f9",border:`2px solid ${done?(step===t?"#16a34a":"#3b82f6"):active?"#3b82f6":"#e5e7eb"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:done?"#fff":active?"#3b82f6":"#94a3b8"}}>{done?"✓":i+1}</div>
+          <div style={{width:24,height:24,borderRadius:"50%",zIndex:1,position:"relative",background:done?(step===6?"#16a34a":"#3b82f6"):active?"#bfdbfe":"#f1f5f9",border:`2px solid ${done?(step===6?"#16a34a":"#3b82f6"):active?"#3b82f6":"#e5e7eb"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:done?"#fff":active?"#3b82f6":"#94a3b8"}}>{done?"✓":i+1}</div>
           <div style={{fontSize:9,color:done?"#3b82f6":active?"#1d4ed8":"#94a3b8",textAlign:"center",marginTop:4,lineHeight:1.3}}>{s}</div>
         </div>;
       })}
@@ -123,52 +94,49 @@ const PBar = ({step, compact}) => {
   );
 };
 
-/* ── 로그인 ── */
-function LoginScreen({onLogin, adminPw, members}) {
-  const [mode,setMode] = useState(null);
-  const [pw,setPw]     = useState("");
-  const [err,setErr]   = useState("");
-  const tryAdmin = () => {
-  const savedPw = (window._adminPw || adminPw || "981105");
-  if(pw === savedPw) onLogin({role:"admin",name:"관리자"});
-  else setErr("비밀번호가 틀렸습니다.");
-};
-  return (
+/* ══════════════════════════════════════
+   로그인 화면
+══════════════════════════════════════ */
+function Login({onLogin, adminPw, members}) {
+  const [mode,setMode]=useState(null);
+  const [pw,setPw]=useState("");
+  const [err,setErr]=useState("");
+  const try1=()=>{if(pw===adminPw)onLogin({role:"admin",name:"관리자"});else setErr("비밀번호가 틀렸습니다.");};
+  return(
     <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{width:400,display:"flex",flexDirection:"column",alignItems:"center",gap:22}}>
-        <div style={{textAlign:"center"}}><div style={{fontSize:48,marginBottom:8}}>🏫</div><div style={{fontSize:24,fontWeight:800,color:"#fff"}}>현장조사팀</div><div style={{fontSize:13,color:"#64748b",marginTop:4}}>시설안전점검 관리 대시보드</div></div>
-        {!mode&&<div style={{width:"100%",display:"flex",flexDirection:"column",gap:12}}>
-          <button onClick={()=>setMode("admin")} style={{padding:"18px",borderRadius:16,border:"2px solid #1d4ed8",background:"#1e40af",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+      <div style={{width:400,display:"flex",flexDirection:"column",gap:20,alignItems:"center"}}>
+        <div style={{textAlign:"center"}}><div style={{fontSize:48}}>🏫</div><div style={{fontSize:22,fontWeight:800,color:"#fff",marginTop:8}}>현장조사팀</div><div style={{fontSize:13,color:"#64748b",marginTop:4}}>시설안전점검 관리 대시보드</div></div>
+        {!mode&&<div style={{width:"100%",display:"flex",flexDirection:"column",gap:10}}>
+          <button onClick={()=>setMode("admin")} style={{padding:"18px",borderRadius:14,border:"2px solid #1d4ed8",background:"#1e40af",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
             <div style={{width:44,height:44,borderRadius:"50%",background:"#1d4ed8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔐</div>
-            <div style={{textAlign:"left"}}><div>관리자 로그인</div><div style={{fontSize:12,fontWeight:400,color:"#93c5fd",marginTop:2}}>매출·팀원관리 포함 전체 접근</div></div>
+            <div style={{textAlign:"left"}}><div>관리자 로그인</div><div style={{fontSize:12,fontWeight:400,color:"#93c5fd",marginTop:2}}>매출·설정 포함 전체 접근</div></div>
           </button>
-          <button onClick={()=>setMode("member")} style={{padding:"18px",borderRadius:16,border:"2px solid #334155",background:"#1e293b",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+          <button onClick={()=>setMode("member")} style={{padding:"18px",borderRadius:14,border:"2px solid #334155",background:"#1e293b",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
             <div style={{width:44,height:44,borderRadius:"50%",background:"#334155",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>👤</div>
             <div style={{textAlign:"left"}}><div>팀원으로 입장</div><div style={{fontSize:12,fontWeight:400,color:"#94a3b8",marginTop:2}}>현장관리·일정·채팅 접근</div></div>
           </button>
         </div>}
-        {mode==="admin"&&<div style={{width:"100%",background:"#1e293b",borderRadius:16,padding:"28px",border:"1px solid #334155"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+        {mode==="admin"&&<div style={{width:"100%",background:"#1e293b",borderRadius:14,padding:"26px",border:"1px solid #334155"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
             <button onClick={()=>{setMode(null);setErr("");setPw("");}} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:18}}>←</button>
-            <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>🔐 관리자 로그인</div>
+            <div style={{fontWeight:700,fontSize:15,color:"#fff"}}>🔐 관리자 로그인</div>
           </div>
-          <label style={{fontSize:12,color:"#94a3b8",display:"block",marginBottom:6}}>비밀번호</label>
-          <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&tryAdmin()} placeholder="관리자 비밀번호 입력"
-            style={{width:"100%",border:`1px solid ${err?"#ef4444":"#334155"}`,borderRadius:10,padding:"12px 14px",fontSize:14,background:"#0f172a",color:"#fff",boxSizing:"border-box",outline:"none"}}/>
-          {err&&<div style={{color:"#ef4444",fontSize:12,marginTop:6}}>{err}</div>}
-          <button onClick={tryAdmin} style={{width:"100%",marginTop:16,padding:"13px",borderRadius:10,border:"none",background:"#1d4ed8",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>로그인</button>
+          <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&try1()} placeholder="비밀번호 입력"
+            style={{width:"100%",border:`1px solid ${err?"#ef4444":"#334155"}`,borderRadius:10,padding:"12px 14px",fontSize:14,background:"#0f172a",color:"#fff",boxSizing:"border-box",outline:"none",marginBottom:err?6:14}}/>
+          {err&&<div style={{color:"#ef4444",fontSize:12,marginBottom:10}}>{err}</div>}
+          <button onClick={try1} style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"#1d4ed8",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>로그인</button>
         </div>}
-        {mode==="member"&&<div style={{width:"100%",background:"#1e293b",borderRadius:16,padding:"28px",border:"1px solid #334155"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+        {mode==="member"&&<div style={{width:"100%",background:"#1e293b",borderRadius:14,padding:"26px",border:"1px solid #334155"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
             <button onClick={()=>setMode(null)} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:18}}>←</button>
-            <div style={{fontWeight:700,fontSize:16,color:"#fff"}}>👤 팀원 입장</div>
+            <div style={{fontWeight:700,fontSize:15,color:"#fff"}}>👤 팀원 입장</div>
           </div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {members.map((m,i)=>(
               <button key={m} onClick={()=>onLogin({role:"member",name:m})}
-                style={{padding:"13px 16px",borderRadius:12,border:"1px solid #334155",background:"#0f172a",cursor:"pointer",fontWeight:600,fontSize:14,display:"flex",alignItems:"center",gap:12,color:"#fff"}}>
-                <div style={{width:36,height:36,borderRadius:"50%",background:mColor(m,i),color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:16}}>{m[0]}</div>
-                {m}<span style={{marginLeft:"auto",fontSize:11,color:"#475569"}}>팀원</span>
+                style={{padding:"12px 16px",borderRadius:12,border:"1px solid #334155",background:"#0f172a",cursor:"pointer",fontWeight:600,fontSize:14,display:"flex",alignItems:"center",gap:12,color:"#fff"}}>
+                <div style={{width:34,height:34,borderRadius:"50%",background:mColor(m,i),color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:15}}>{m[0]}</div>
+                {m}
               </button>
             ))}
           </div>
@@ -178,120 +146,325 @@ function LoginScreen({onLogin, adminPw, members}) {
   );
 }
 
-/* ── 설정 ── */
-function SettingsPanel({adminPw,setAdminPw,members,setMembers}) {
-  const [pwForm,setPwForm]=useState({cur:"",next:"",confirm:""});
-  const [pwMsg,setPwMsg]=useState(null);
-  const [memList,setMemList]=useState([...members]);
-  const [newMem,setNewMem]=useState("");
-  const [memMsg,setMemMsg]=useState(null);
-  const [editIdx,setEditIdx]=useState(null);
-  const [editVal,setEditVal]=useState("");
+/* ══════════════════════════════════════
+   현장 관리 탭
+══════════════════════════════════════ */
+function SiteManager({rows, setRows, members, isAdmin}) {
+  const fileRef = useRef();
+  const [search,  setSearch]  = useState("");
+  const [preview, setPreview] = useState(null);
+  const [detail,  setDetail]  = useState(null);
+  const [schedM,  setSchedM]  = useState(null);
+  const [sForm,   setSForm]   = useState({});
+  const [colF,    setColF]    = useState({});
+  const [openDD,  setOpenDD]  = useState(null);
+  const [ddSrch,  setDdSrch]  = useState("");
 
-  const savePw=()=>{
-    if(pwForm.cur!==adminPw){setPwMsg({type:"err",text:"현재 비밀번호가 틀렸습니다."});return;}
-    if(pwForm.next.length<4){setPwMsg({type:"err",text:"새 비밀번호는 4자 이상이어야 합니다."});return;}
-    if(pwForm.next!==pwForm.confirm){setPwMsg({type:"err",text:"새 비밀번호가 일치하지 않습니다."});return;}
-    fbSetSettings("adminPw", pwForm.next);
-    setAdminPw(pwForm.next);
-    setPwForm({cur:"",next:"",confirm:""});
-    setPwMsg({type:"ok",text:"✅ 비밀번호가 변경됐습니다."});
-    setTimeout(()=>setPwMsg(null),3000);
-  };
-  const saveMembers=list=>{
-    fbSetSettings("members", list);
-    setMembers(list); setMemList(list);
-    setMemMsg({type:"ok",text:"✅ 저장됐습니다."});
-    setTimeout(()=>setMemMsg(null),3000);
-  };
-  const addMember=()=>{const n=newMem.trim();if(!n)return;if(memList.includes(n)){setMemMsg({type:"err",text:"이미 존재합니다."});return;}const u=[...memList,n];setMemList(u);setNewMem("");saveMembers(u);};
-  const removeMember=idx=>{const u=memList.filter((_,i)=>i!==idx);setMemList(u);saveMembers(u);};
-  const saveEdit=idx=>{const n=editVal.trim();if(!n)return;const u=memList.map((m,i)=>i===idx?n:m);setMemList(u);setEditIdx(null);setEditVal("");saveMembers(u);};
+  const fCols = ["점검종류","지역","학교명","납품방법"];
+  const uniq   = col => [...new Set(rows.map(r=>r[col]).filter(Boolean))].sort();
+  const isFilt = col => colF[col]&&colF[col].size>0;
+  const togCol  = (col,val) => setColF(p=>{const s=new Set(p[col]||[]);s.has(val)?s.delete(val):s.add(val);return{...p,[col]:s};});
+  const clrCol  = col => setColF(p=>({...p,[col]:new Set()}));
 
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:20,maxWidth:600}}>
-      <div style={{background:"#eff6ff",borderRadius:12,padding:"12px 18px",border:"1px solid #bfdbfe",fontSize:13,color:"#1d4ed8"}}>🔐 <strong>관리자 전용 설정</strong> — 변경 사항은 팀 전체에 실시간 반영됩니다.</div>
-      {/* 비번 */}
-      <div style={{background:"#fff",borderRadius:16,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
-        <div style={{padding:"16px 22px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20}}>🔑</span><div><div style={{fontWeight:700,fontSize:15}}>관리자 비밀번호 변경</div></div></div>
-        <div style={{padding:"20px 22px",display:"flex",flexDirection:"column",gap:12}}>
-          {[["현재 비밀번호","cur"],["새 비밀번호","next"],["새 비밀번호 확인","confirm"]].map(([label,key])=>(
-            <div key={key}><label style={{fontSize:12,fontWeight:600,color:"#374151",display:"block",marginBottom:5}}>{label}</label>
-            <input type="password" value={pwForm[key]} onChange={e=>setPwForm(f=>({...f,[key]:e.target.value}))} placeholder={label}
-              style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:9,padding:"10px 14px",fontSize:13,boxSizing:"border-box",outline:"none"}}/></div>
-          ))}
-          {pwMsg&&<div style={{padding:"8px 12px",borderRadius:8,background:pwMsg.type==="ok"?"#f0fdf4":"#fef2f2",color:pwMsg.type==="ok"?"#16a34a":"#dc2626",fontSize:12}}>{pwMsg.text}</div>}
-          <button onClick={savePw} style={{padding:"11px",borderRadius:10,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>비밀번호 변경</button>
+  const update = updated => { setRows(updated); fbRows(updated); };
+
+  /* 엑셀 파싱 */
+  const handleFile = e => {
+    const file=e.target.files[0]; if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:"array"});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const data=XLSX.utils.sheet_to_json(ws,{defval:""});
+        const parsed=data.map((r,i)=>({
+          id:`r_${Date.now()}_${i}`,
+          no: r["No."]||r["NO"]||rows.length+i+1,
+          점검종류: r["점검종류"]||"",
+          지역: r["지역"]||"",
+          학교명: r["학교명"]||"",
+          시설명: r["시설명"]||"",
+          동수: parseInt(r["동수"])||0,
+          연면적: parseFloat(r["연면적(m²)"]||r["연면적"])||0,
+          현장조사: r["현장조사"]||"",
+          착수일: r["착수일"]||"",
+          완수일: r["완수일"]||"",
+          FMS: r["FMS 아이디/비번"]||r["FMS"]||"",
+          특기사항: r["특기사항"]||"",
+          납품방법: r["납품방법"]||"현장납품",
+          lead: members[0]||"",
+          progress: 0,
+          status: "예정",
+          계약금액: 0,
+          현장참여: []
+        })).filter(r=>r.학교명);
+        setPreview(parsed);
+      }catch(err){alert("파일을 읽을 수 없어요. 엑셀/CSV 파일인지 확인해주세요.");}
+    };
+    reader.readAsArrayBuffer(file); e.target.value="";
+  };
+
+  const confirmImport = () => {
+    const updated=[...rows,...preview];
+    update(updated); setPreview(null);
+  };
+
+  const filtered = rows.filter(r=>{
+    if(search&&!`${r.학교명}${r.시설명}${r.지역}`.includes(search)) return false;
+    for(const col of fCols){const s=colF[col];if(s&&s.size>0&&!s.has(r[col]))return false;}
+    return true;
+  });
+
+  const hdrs=[
+    {k:"no",l:"No."},{k:"점검종류",l:"점검종류",f:true},{k:"지역",l:"지역",f:true},
+    {k:"학교명",l:"학교명",f:true},{k:"시설명",l:"시설명"},{k:"동수",l:"동수"},
+    {k:"연면적",l:"연면적(㎡)"},{k:"현장조사",l:"현장조사일"},{k:"착수일",l:"착수일"},
+    {k:"완수일",l:"완수일"},{k:"출력기간",l:"D-Day"},{k:"특기사항",l:"특기사항"},
+    {k:"납품방법",l:"납품방법",f:true},{k:"lead",l:"담당"},{k:"progress",l:"진행단계"},{k:"status",l:"상태"},
+  ];
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}} onClick={()=>setOpenDD(null)}>
+      {/* 툴바 */}
+      <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <div style={{position:"relative",maxWidth:300,flex:1}}>
+          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#94a3b8"}}>🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="학교명, 지역 검색..."
+            style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:10,padding:"9px 12px 9px 34px",fontSize:13,boxSizing:"border-box",outline:"none"}}/>
+          {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8"}}>✕</button>}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {Object.values(colF).some(s=>s&&s.size>0)&&
+            <button onClick={()=>setColF({})} style={{padding:"7px 12px",borderRadius:8,border:"1px solid #fca5a5",background:"#fff1f2",color:"#dc2626",fontSize:12,cursor:"pointer",fontWeight:600}}>필터 초기화</button>}
+          <button onClick={()=>fileRef.current.click()} style={{padding:"7px 16px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>📤 엑셀 업로드</button>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
         </div>
       </div>
-      {/* 팀원 */}
-      <div style={{background:"#fff",borderRadius:16,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
-        <div style={{padding:"16px 22px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:20}}>👥</span><div><div style={{fontWeight:700,fontSize:15}}>팀원 이름 관리</div><div style={{fontSize:12,color:"#64748b",marginTop:1}}>변경하면 팀 전체에 바로 반영됩니다</div></div></div>
-        <div style={{padding:"20px 22px"}}>
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
-            {memList.map((m,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}}>
-                <div style={{width:34,height:34,borderRadius:"50%",background:mColor(m,i),color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:15,flexShrink:0}}>{m[0]}</div>
-                {editIdx===i?(
-                  <div style={{display:"flex",gap:6,flex:1,alignItems:"center"}}>
-                    <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEdit(i);if(e.key==="Escape")setEditIdx(null);}}
-                      style={{flex:1,border:"2px solid #1d4ed8",borderRadius:7,padding:"6px 10px",fontSize:13,outline:"none"}}/>
-                    <button onClick={()=>saveEdit(i)} style={{padding:"6px 12px",borderRadius:7,border:"none",background:"#1d4ed8",color:"#fff",fontSize:12,cursor:"pointer",fontWeight:600}}>저장</button>
-                    <button onClick={()=>setEditIdx(null)} style={{padding:"6px 10px",borderRadius:7,border:"1px solid #e5e7eb",background:"#fff",fontSize:12,cursor:"pointer"}}>취소</button>
-                  </div>
-                ):(
-                  <><span style={{flex:1,fontWeight:600,fontSize:14}}>{m}</span>
-                  <button onClick={()=>{setEditIdx(i);setEditVal(m);}} style={{padding:"5px 10px",borderRadius:7,border:"1px solid #e2e8f0",background:"#fff",fontSize:11,cursor:"pointer"}}>✏️ 수정</button>
-                  <button onClick={()=>removeMember(i)} style={{padding:"5px 10px",borderRadius:7,border:"1px solid #fca5a5",background:"#fff1f2",fontSize:11,cursor:"pointer",color:"#dc2626"}}>🗑 삭제</button></>
-                )}
+      <div style={{fontSize:12,color:"#64748b"}}>전체 <strong>{rows.length}</strong>건 · 표시 <strong style={{color:"#1d4ed8"}}>{filtered.length}</strong>건</div>
+
+      {/* 테이블 */}
+      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1100}}>
+          <thead>
+            <tr style={{background:"#0f172a",color:"#fff"}}>
+              {hdrs.map(h=>(
+                <th key={h.k} style={{padding:0,textAlign:"left",fontSize:10,whiteSpace:"nowrap",borderRight:"1px solid #1e293b",position:"relative"}}>
+                  {h.f?(
+                    <button onClick={e=>{e.stopPropagation();setOpenDD(openDD===h.k?null:h.k);setDdSrch("");}}
+                      style={{width:"100%",padding:"10px 8px",background:"none",border:"none",cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",gap:4,fontWeight:600,fontSize:10}}>
+                      {h.l}<span style={{marginLeft:"auto",fontSize:9,background:isFilt(h.k)?"#f97316":"rgba(255,255,255,.15)",borderRadius:4,padding:"1px 5px"}}>{isFilt(h.k)?`${colF[h.k].size}✓`:"▼"}</span>
+                    </button>
+                  ):<div style={{padding:"10px 8px",fontWeight:600}}>{h.l}</div>}
+                  {h.f&&openDD===h.k&&(
+                    <div style={{position:"absolute",top:"100%",left:0,zIndex:1000,background:"#fff",border:"1px solid #e5e7eb",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,.15)",minWidth:160,color:"#1e293b"}}>
+                      <div style={{padding:"8px"}}><input value={ddSrch} onChange={e=>setDdSrch(e.target.value)} placeholder="검색..." style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:6,padding:"5px 8px",fontSize:11,boxSizing:"border-box"}} autoFocus/></div>
+                      <div style={{maxHeight:180,overflowY:"auto"}}>
+                        <button onClick={()=>clrCol(h.k)} style={{width:"100%",padding:"6px 10px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:11,color:"#94a3b8"}}>전체 해제</button>
+                        {uniq(h.k).filter(v=>!ddSrch||v.includes(ddSrch)).map(v=>{
+                          const chk=colF[h.k]&&colF[h.k].has(v);
+                          return<button key={v} onClick={()=>togCol(h.k,v)} style={{width:"100%",padding:"6px 10px",background:chk?"#eff6ff":"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:11,color:"#1e293b",display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{width:13,height:13,border:`1px solid ${chk?"#1d4ed8":"#d1d5db"}`,borderRadius:3,background:chk?"#1d4ed8":"#fff",display:"inline-flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,flexShrink:0}}>{chk?"✓":""}</span>
+                            {v}<span style={{marginLeft:"auto",fontSize:10,color:"#94a3b8"}}>{rows.filter(r=>r[h.k]===v).length}</span>
+                          </button>;
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r,i)=>{
+              const d=diffDays(r.완수일);
+              return(
+                <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
+                  <td style={{padding:"9px 8px",color:"#94a3b8",borderRight:"1px solid #f1f5f9"}}>{r.no}</td>
+                  <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9"}}><span style={{background:"#ede9fe",color:"#7c3aed",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>{r.점검종류}</span></td>
+                  <td style={{padding:"9px 8px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.지역}</td>
+                  <td style={{padding:"9px 8px",fontWeight:700,borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>
+                    <button onClick={()=>setDetail(r)} style={{background:"none",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#1d4ed8",padding:0,textDecoration:"underline"}}>{r.학교명}</button>
+                  </td>
+                  <td style={{padding:"9px 8px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.시설명}</td>
+                  <td style={{padding:"9px 8px",textAlign:"center",borderRight:"1px solid #f1f5f9"}}>{r.동수}</td>
+                  <td style={{padding:"9px 8px",textAlign:"right",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
+                  <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.현장조사?<span style={{color:"#1d4ed8",fontWeight:600}}>{r.현장조사}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
+                  <td style={{padding:"9px 8px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.착수일||<span style={{color:"#d1d5db"}}>-</span>}</td>
+                  <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.완수일?<span style={{color:"#ea580c",fontWeight:600}}>{r.완수일}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
+                  <td style={{padding:"9px 8px",textAlign:"center",borderRight:"1px solid #f1f5f9"}}>
+                    <span style={{background:urgBg(d),color:urgC(d),borderRadius:20,padding:"2px 9px",fontWeight:700,fontSize:11}}>{dLabel(d)}</span>
+                  </td>
+                  <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",maxWidth:100}}>{r.특기사항?<span style={{background:"#fff7ed",color:"#92400e",borderRadius:6,padding:"2px 5px",fontSize:10}}>{r.특기사항}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
+                  <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}><span style={{fontSize:11,fontWeight:600,color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed"}}>{r.납품방법==="현장납품"?"🏫 현장":"📦 택배"}</span></td>
+                  <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9"}}>
+                    {r.lead
+                      ?<div style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={20}/><span style={{fontSize:11}}>{r.lead}</span></div>
+                      :<button onClick={()=>{setSchedM(r);setSForm({lead:members[0]||"",납품방법:r.납품방법||"현장납품"});}} style={{padding:"3px 8px",borderRadius:6,border:"none",background:"#f97316",color:"#fff",fontSize:10,fontWeight:600,cursor:"pointer"}}>담당 배정</button>}
+                  </td>
+                  <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",minWidth:130}}><PBar step={r.progress||0} compact/></td>
+                  <td style={{padding:"9px 8px",whiteSpace:"nowrap"}}>
+                    <Bdg label={r.status||"예정"} bg={SS[r.status||"예정"]?.bg||"#f3f4f6"} c={SS[r.status||"예정"]?.c||"#6b7280"}/>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length===0&&<tr><td colSpan={16} style={{padding:40,textAlign:"center",color:"#94a3b8"}}>데이터 없음 — 엑셀 업로드 또는 직접 추가해주세요</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 업로드 미리보기 모달 */}
+      {preview&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"28px",width:"90vw",maxWidth:860,maxHeight:"85vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>📤 엑셀 업로드 미리보기</h2><p style={{margin:"4px 0 0",fontSize:12,color:"#64748b"}}>{preview.length}개 항목 인식됨</p></div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setPreview(null)} style={{padding:"7px 14px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",fontSize:13,cursor:"pointer"}}>취소</button>
+                <button onClick={confirmImport} style={{padding:"7px 16px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>✅ 가져오기</button>
+              </div>
+            </div>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                <thead><tr style={{background:"#f8fafc"}}>
+                  {["No.","점검종류","지역","학교명","시설명","동수","연면적","현장조사일","착수일","완수일","특기사항","납품방법"].map(h=>
+                    <th key={h} style={{padding:"8px 10px",textAlign:"left",color:"#64748b",fontWeight:600,fontSize:10,whiteSpace:"nowrap",borderBottom:"2px solid #e2e8f0"}}>{h}</th>)}
+                </tr></thead>
+                <tbody>{preview.map((r,i)=>(
+                  <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
+                    <td style={{padding:"7px 10px",color:"#94a3b8"}}>{r.no}</td>
+                    <td style={{padding:"7px 10px"}}><span style={{background:"#ede9fe",color:"#7c3aed",borderRadius:20,padding:"2px 7px",fontSize:10,fontWeight:600}}>{r.점검종류||"-"}</span></td>
+                    <td style={{padding:"7px 10px",color:"#475569"}}>{r.지역||"-"}</td>
+                    <td style={{padding:"7px 10px",fontWeight:700}}>{r.학교명}</td>
+                    <td style={{padding:"7px 10px",color:"#475569"}}>{r.시설명||"-"}</td>
+                    <td style={{padding:"7px 10px",textAlign:"center"}}>{r.동수}</td>
+                    <td style={{padding:"7px 10px",textAlign:"right"}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
+                    <td style={{padding:"7px 10px",color:"#1d4ed8",fontWeight:600}}>{r.현장조사||"-"}</td>
+                    <td style={{padding:"7px 10px"}}>{r.착수일||"-"}</td>
+                    <td style={{padding:"7px 10px",color:"#ea580c",fontWeight:600}}>{r.완수일||"-"}</td>
+                    <td style={{padding:"7px 10px"}}>{r.특기사항||"-"}</td>
+                    <td style={{padding:"7px 10px",color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed",fontWeight:600}}>{r.납품방법==="현장납품"?"🏫":"📦"} {r.납품방법}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 담당 배정 모달 */}
+      {schedM&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"26px",width:440,boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
+            <h2 style={{margin:"0 0 14px",fontSize:16,fontWeight:700}}>담당자 및 일정 배정</h2>
+            <div style={{background:"#f8fafc",borderRadius:10,padding:"12px",marginBottom:14,border:"1px solid #e2e8f0"}}>
+              <div style={{fontWeight:700,fontSize:14}}>{schedM.학교명} · {schedM.시설명}</div>
+              {schedM.특기사항&&<div style={{marginTop:6,background:"#fff7ed",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#92400e"}}>⚠️ {schedM.특기사항}</div>}
+            </div>
+            {[["현장조사일","현장조사"],["착수일","착수일"],["완수일","완수일"]].map(([l,k])=>(
+              <div key={k} style={{marginBottom:10}}>
+                <label style={{fontSize:12,fontWeight:600,color:"#374151",display:"block",marginBottom:4}}>{l}</label>
+                <input type="date" defaultValue={schedM[k]||""} onChange={e=>setSForm(f=>({...f,[k]:e.target.value}))}
+                  style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,boxSizing:"border-box"}}/>
               </div>
             ))}
-          </div>
-          <div style={{borderTop:"1px solid #f1f5f9",paddingTop:16}}>
-            <div style={{fontSize:12,fontWeight:600,color:"#374151",marginBottom:8}}>팀원 추가</div>
-            <div style={{display:"flex",gap:8}}>
-              <input value={newMem} onChange={e=>setNewMem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addMember()} placeholder="추가할 팀원 이름"
-                style={{flex:1,border:"1px solid #e5e7eb",borderRadius:9,padding:"10px 14px",fontSize:13,outline:"none"}}/>
-              <button onClick={addMember} style={{padding:"10px 18px",borderRadius:9,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>추가</button>
+            <div style={{marginBottom:14}}>
+              <label style={{fontSize:12,fontWeight:600,color:"#374151",display:"block",marginBottom:4}}>주요 담당자</label>
+              <select value={sForm.lead||members[0]} onChange={e=>setSForm(f=>({...f,lead:e.target.value}))}
+                style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,background:"#fff"}}>
+                {members.map(m=><option key={m}>{m}</option>)}
+              </select>
             </div>
-            {memMsg&&<div style={{marginTop:8,padding:"7px 12px",borderRadius:8,background:memMsg.type==="ok"?"#f0fdf4":"#fef2f2",color:memMsg.type==="ok"?"#16a34a":"#dc2626",fontSize:12}}>{memMsg.text}</div>}
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setSchedM(null)} style={{padding:"8px 16px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",fontSize:13,cursor:"pointer"}}>취소</button>
+              <button onClick={()=>{const u=rows.map(row=>row.id===schedM.id?{...row,...sForm,status:"예정"}:row);update(u);setSchedM(null);}}
+                style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>저장</button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* 상세 모달 */}
+      {detail&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"26px",width:460,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <h2 style={{margin:0,fontSize:16,fontWeight:700}}>{detail.학교명}</h2>
+              <button onClick={()=>setDetail(null)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#94a3b8"}}>✕</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+              {[["점검종류",detail.점검종류],["지역",detail.지역],["시설명",detail.시설명],["동수",`${detail.동수}개 동`],["연면적",`${detail.연면적?.toLocaleString()} ㎡`],["FMS",detail.FMS||"-"],["현장조사일",detail.현장조사||"-"],["완수일",detail.완수일||"-"],["납품방법",detail.납품방법],["담당자",detail.lead||"미배정"]].map(([l,v])=>(
+                <div key={l} style={{background:"#f8fafc",borderRadius:8,padding:"10px 12px"}}>
+                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>{l}</div>
+                  <div style={{fontSize:13,fontWeight:600}}>{v}</div>
+                </div>
+              ))}
+            </div>
+            {detail.특기사항&&<div style={{background:"#fff7ed",borderRadius:8,padding:"10px",fontSize:12,color:"#92400e",marginBottom:12}}>⚠️ {detail.특기사항}</div>}
+            <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>보고서 진행 단계</div>
+            <PBar step={detail.progress||0}/>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── 팀원 관리 ── */
-function MemberManager({rows,members}) {
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{background:"#eff6ff",borderRadius:12,padding:"12px 18px",border:"1px solid #bfdbfe",fontSize:13,color:"#1d4ed8"}}>🔐 <strong>관리자 전용</strong></div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:16}}>
-        {members.map((m,idx)=>{
-          const myRows=rows.filter(r=>r.lead===m);
-          const done=myRows.filter(r=>r.progress===6).length;
-          const delayed=myRows.filter(r=>r.status==="지연").length;
-          const totalAmt=myRows.reduce((s,r)=>s+(r.계약금액||0),0);
-          const bg=mColor(m,idx);
-          return (
-            <div key={m} style={{background:"#fff",borderRadius:16,boxShadow:"0 1px 4px rgba(0,0,0,.08)",overflow:"hidden"}}>
-              <div style={{background:bg,padding:"20px 22px",display:"flex",alignItems:"center",gap:14}}>
-                <div style={{width:50,height:50,borderRadius:"50%",background:"rgba(255,255,255,.25)",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:22,border:"2px solid rgba(255,255,255,.4)"}}>{m[0]}</div>
-                <div><div style={{fontWeight:800,fontSize:17,color:"#fff"}}>{m}</div><div style={{fontSize:12,color:"rgba(255,255,255,.75)",marginTop:2}}>현장조사팀 · 팀원</div></div>
-              </div>
-              <div style={{padding:"18px 22px"}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-                  {[["담당 건수",myRows.length+"건","#1d4ed8"],["완료",done+"건","#16a34a"],["지연",delayed+"건","#dc2626"],["담당 금액",won(totalAmt),"#7c3aed"]].map(([l,v,c])=>(
-                    <div key={l} style={{background:"#f8fafc",borderRadius:10,padding:"10px 12px"}}><div style={{fontSize:10,color:"#94a3b8",marginBottom:3}}>{l}</div><div style={{fontSize:14,fontWeight:800,color:c}}>{v}</div></div>
-                  ))}
+/* ══════════════════════════════════════
+   긴급 보고서 탭
+══════════════════════════════════════ */
+function UrgentReport({rows, setRows, isAdmin}) {
+  const sorted = [...rows].filter(r=>r.progress<6).sort((a,b)=>diffDays(a.완수일)-diffDays(b.완수일));
+
+  const updProg = (id, step) => {
+    const updated = rows.map(r=>r.id===id ? {...r, progress:step} : r);
+    setRows(updated); fbRows(updated);
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{background:"#eff6ff",borderRadius:12,padding:"12px 16px",border:"1px solid #bfdbfe",fontSize:13,color:"#1d4ed8"}}>
+        🚨 <strong>보고서 완수일 기준 긴급도 순위</strong> — 완료된 항목 제외 · 엑셀 업로드 시 자동 반영
+      </div>
+      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
+        {sorted.length===0&&<div style={{padding:48,textAlign:"center",color:"#94a3b8"}}>🎉 모든 보고서가 완료됐어요!</div>}
+        {sorted.map((r,i)=>{
+          const d=diffDays(r.완수일);
+          const rc=i===0?"#ef4444":i===1?"#f97316":i===2?"#eab308":"#94a3b8";
+          return(
+            <div key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i===0?"#fff8f8":i===1?"#fff9f5":"#fff"}}>
+              <div style={{display:"flex",alignItems:"center",padding:"14px 20px",gap:12,flexWrap:"wrap"}}>
+                {/* 순위 */}
+                <div style={{width:32,height:32,borderRadius:"50%",background:rc,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:14,flexShrink:0}}>{i+1}</div>
+                {/* 학교명 + 진행바 */}
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:5}}>{r.학교명} <span style={{fontSize:11,color:"#64748b",fontWeight:400}}>· {r.시설명}</span></div>
+                  <PBar step={r.progress||0} compact/>
                 </div>
-                {myRows.length>0&&<div style={{borderTop:"1px solid #f1f5f9",paddingTop:12}}><div style={{fontSize:11,color:"#94a3b8",marginBottom:8}}>담당 현장</div>
-                  {myRows.map(r=><div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,fontSize:12}}>
-                    <span style={{color:"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,marginRight:8}}>{r.학교명}</span>
-                    <PBar step={r.progress} compact/>
-                  </div>)}
-                </div>}
+                {/* 담당자 */}
+                {r.lead&&<div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}><Av name={r.lead} size={24}/><span style={{fontSize:11,fontWeight:600}}>{r.lead}</span></div>}
+                {/* 완수일 & 납품방법 */}
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
+                  <span style={{fontSize:10,color:"#94a3b8"}}>완수일</span>
+                  <span style={{fontSize:12,color:"#ea580c",fontWeight:600}}>{r.완수일||"-"}</span>
+                  <span style={{fontSize:11,color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed",fontWeight:600}}>{r.납품방법==="현장납품"?"🏫 현장":"📦 택배"}</span>
+                </div>
+                {/* D-Day */}
+                <div style={{background:urgBg(d),color:urgC(d),borderRadius:10,padding:"8px 14px",fontWeight:800,fontSize:20,minWidth:70,textAlign:"center",flexShrink:0}}>{dLabel(d)}</div>
+              </div>
+              {/* 진행 단계 버튼 */}
+              <div style={{padding:"0 20px 14px 64px",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{fontSize:11,color:"#94a3b8",marginRight:4}}>단계 업데이트:</span>
+                {STEPS.map((st,idx)=>(
+                  <button key={st} onClick={()=>updProg(r.id, idx+1)}
+                    style={{padding:"5px 12px",borderRadius:20,border:"1px solid",fontSize:11,cursor:"pointer",fontWeight:600,
+                      borderColor:r.progress===idx+1?"#1d4ed8":r.progress>idx+1?"#86efac":"#e5e7eb",
+                      background:r.progress===idx+1?"#1d4ed8":r.progress>idx+1?"#f0fdf4":"#fff",
+                      color:r.progress===idx+1?"#fff":r.progress>idx+1?"#16a34a":"#6b7280"}}>
+                    {r.progress>idx+1?"✓ ":""}{st}
+                  </button>
+                ))}
+                <button onClick={()=>updProg(r.id,0)} style={{padding:"5px 10px",borderRadius:20,border:"1px solid #e5e7eb",fontSize:11,cursor:"pointer",color:"#94a3b8",background:"#f8fafc"}}>초기화</button>
               </div>
             </div>
           );
@@ -301,322 +474,42 @@ function MemberManager({rows,members}) {
   );
 }
 
-/* ── 매출 현황 ── */
-function RevenueView({rows,setRows}) {
-  const [editId,setEditId]=useState(null);
-  const [editVal,setEditVal]=useState("");
-  const total=rows.reduce((s,r)=>s+(r.계약금액||0),0);
-  const completed=rows.filter(r=>r.progress===6).reduce((s,r)=>s+(r.계약금액||0),0);
-  const inProgress=rows.filter(r=>r.progress>0&&r.progress<6).reduce((s,r)=>s+(r.계약금액||0),0);
-  const notStarted=rows.filter(r=>r.progress===0).reduce((s,r)=>s+(r.계약금액||0),0);
-  const noAmount=rows.filter(r=>!r.계약금액).length;
-  const pct=(v,t)=>t>0?Math.round(v/t*100):0;
-  const byType={};
-  rows.forEach(r=>{if(!byType[r.점검종류])byType[r.점검종류]={count:0,amount:0};byType[r.점검종류].count++;byType[r.점검종류].amount+=(r.계약금액||0);});
-  const typeColors=["#3b82f6","#8b5cf6","#f59e0b","#10b981","#ef4444","#06b6d4"];
-  const saveEdit=id=>{
-    const n=parseInt(editVal.replace(/,/g,""))||0;
-    const updated=rows.map(row=>row.id===id?{...row,계약금액:n}:row);
-    setRows(updated); fbSetRows(updated); setEditId(null); setEditVal("");
-  };
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:18}}>
-      <div style={{background:"#eff6ff",borderRadius:10,padding:"10px 16px",border:"1px solid #bfdbfe",fontSize:12,color:"#1d4ed8"}}>🔐 <strong>관리자 전용</strong> — 계약 금액 및 매출 현황</div>
-      {noAmount>0&&<div style={{background:"#fff7ed",borderRadius:10,padding:"10px 16px",border:"1px solid #fed7aa",fontSize:12,color:"#c2410c"}}>⚠️ 금액 미입력 <strong>{noAmount}건</strong></div>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14}}>
-        {[{l:"총 계약금액",v:total,c:"#1d4ed8",icon:"💰"},{l:"납품 완료",v:completed,c:"#16a34a",icon:"✅"},{l:"진행중",v:inProgress,c:"#7c3aed",icon:"🔄"},{l:"미착수",v:notStarted,c:"#94a3b8",icon:"⏳"}].map(k=>(
-          <div key={k.l} style={{background:"#fff",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderTop:`3px solid ${k.c}`}}>
-            <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{k.icon} {k.l}</div>
-            <div style={{fontSize:20,fontWeight:800,color:k.c,marginBottom:4}}>{won(k.v)}</div>
-            {total>0&&<><div style={{height:4,background:"#f1f5f9",borderRadius:2}}><div style={{height:4,background:k.c,borderRadius:2,width:`${pct(k.v,total)}%`}}/></div><div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>{pct(k.v,total)}%</div></>}
-          </div>
-        ))}
-      </div>
-      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",padding:"18px 20px"}}>
-        <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>📊 점검종류별 금액</div>
-        {Object.entries(byType).sort((a,b)=>b[1].amount-a[1].amount).map(([type,d],i)=>(
-          <div key={type} style={{marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,fontWeight:600}}>{type}</span><div><span style={{fontSize:13,fontWeight:700,color:typeColors[i%typeColors.length]}}>{won(d.amount)}</span><span style={{fontSize:10,color:"#94a3b8",marginLeft:6}}>{d.count}건</span></div></div>
-            <div style={{height:6,background:"#f1f5f9",borderRadius:3}}><div style={{height:6,background:typeColors[i%typeColors.length],borderRadius:3,width:`${pct(d.amount,total)}%`}}/></div>
-          </div>
-        ))}
-      </div>
-      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
-        <div style={{padding:"14px 20px",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontWeight:700,fontSize:14}}>📋 현장별 계약금액</span><span style={{fontSize:12,color:"#64748b"}}>클릭하여 수정</span></div>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr style={{background:"#f8fafc"}}>{["No.","학교명","시설명","담당","완수일","진행","계약금액"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#64748b",fontWeight:600,fontSize:11,whiteSpace:"nowrap",borderBottom:"2px solid #e2e8f0"}}>{h}</th>)}</tr></thead>
-          <tbody>
-            {rows.map((r,i)=>(
-              <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
-                <td style={{padding:"10px 14px",color:"#94a3b8"}}>{r.no}</td>
-                <td style={{padding:"10px 14px",fontWeight:600}}>{r.학교명}</td>
-                <td style={{padding:"10px 14px",color:"#64748b"}}>{r.시설명}</td>
-                <td style={{padding:"10px 14px"}}>{r.lead?<div style={{display:"flex",alignItems:"center",gap:5}}><Av name={r.lead} size={20}/><span>{r.lead}</span></div>:"-"}</td>
-                <td style={{padding:"10px 14px",color:"#ea580c",whiteSpace:"nowrap"}}>{r.완수일||"-"}</td>
-                <td style={{padding:"10px 14px",minWidth:130}}><PBar step={r.progress||0} compact/></td>
-                <td style={{padding:"10px 14px",minWidth:150}}>
-                  {editId===r.id?(
-                    <div style={{display:"flex",gap:5,alignItems:"center"}}>
-                      <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEdit(r.id);if(e.key==="Escape")setEditId(null);}}
-                        style={{width:110,border:"2px solid #1d4ed8",borderRadius:6,padding:"5px 8px",fontSize:12,outline:"none"}}/>
-                      <button onClick={()=>saveEdit(r.id)} style={{padding:"4px 8px",borderRadius:6,border:"none",background:"#1d4ed8",color:"#fff",fontSize:11,cursor:"pointer"}}>✓</button>
-                      <button onClick={()=>setEditId(null)} style={{padding:"4px 8px",borderRadius:6,border:"1px solid #e5e7eb",background:"#fff",fontSize:11,cursor:"pointer"}}>✕</button>
-                    </div>
-                  ):(
-                    <div onClick={()=>{setEditId(r.id);setEditVal(r.계약금액?String(r.계약금액):"");}}
-                      style={{cursor:"pointer",padding:"6px 10px",borderRadius:8,border:"1px dashed",borderColor:r.계약금액?"#e2e8f0":"#fca5a5",background:r.계약금액?"#f8fafc":"#fff1f2",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={{fontWeight:700,color:r.계약금액?"#1d4ed8":"#f87171",fontSize:13}}>{r.계약금액?won(r.계약금액):"금액 입력"}</span>
-                      <span style={{fontSize:10,color:"#94a3b8"}}>✏️</span>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-            <tr style={{background:"#0f172a",color:"#fff",fontWeight:700}}><td colSpan={6} style={{padding:"12px 14px",fontSize:13}}>합계</td><td style={{padding:"12px 14px",fontSize:15,fontWeight:800,color:"#fbbf24"}}>{won(total)}</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/* ── 현장 관리 ── */
-function SiteManager({rows,setRows,isAdmin,members}) {
-  const fileRef=useRef();
-  const [preview,setPreview]=useState(null);
-  const [schedModal,setSchedModal]=useState(null);
-  const [detailModal,setDetailModal]=useState(null);
-  const [filter,setFilter]=useState("전체");
-  const [search,setSearch]=useState("");
-  const [colFilters,setColFilters]=useState({});
-  const [openDD,setOpenDD]=useState(null);
-  const [dropSearch,setDropSearch]=useState("");
-  const [sForm,setSForm]=useState({lead:members[0]||"",status:"예정"});
-
-  const filterCols=["점검종류","지역","학교명","납품방법"];
-  const uniqueVals=col=>[...new Set(rows.map(r=>r[col]).filter(Boolean))].sort();
-  const isFiltered=col=>colFilters[col]&&colFilters[col].size>0;
-  const toggleCol=(col,val)=>setColFilters(prev=>{const s=new Set(prev[col]||[]);s.has(val)?s.delete(val):s.add(val);return{...prev,[col]:s};});
-  const clearCol=col=>setColFilters(prev=>({...prev,[col]:new Set()}));
-
-  const updateRows = updated => { setRows(updated); fbSetRows(updated); };
-
-  const handleFile=e=>{
-    const file=e.target.files[0];if(!file)return;
-    const reader=new FileReader();
-    reader.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:"array"});const ws=wb.Sheets[wb.SheetNames[0]];const data=XLSX.utils.sheet_to_json(ws,{defval:""});
-      setPreview({rows:data.map((r,i)=>({id:`up_${Date.now()}_${i}`,no:r["No."]||i+1,점검종류:r["점검종류"]||"",지역:r["지역"]||"",학교명:r["학교명"]||"",시설명:r["시설명"]||"",동수:parseInt(r["동수"])||0,연면적:parseFloat(r["연면적(m²)"]||r["연면적"])||0,현장조사:r["현장조사"]||"",착수일:r["착수일"]||"",완수일:r["완수일"]||"",FMS:r["FMS 아이디/비번"]||r["FMS"]||"",특기사항:r["특기사항"]||"",납품방법:r["납품방법"]||"현장납품",lead:members[0]||"",progress:0,status:"예정",계약금액:0,현장참여:[]})).filter(r=>r.학교명)});
-    }catch(err){console.error(err);}};
-    reader.readAsArrayBuffer(file);e.target.value="";
-  };
-
-  const unscheduled=rows.filter(r=>!r.현장조사&&!r.착수일).length;
-  const filtered=rows.filter(r=>{
-    if(filter==="미배정"&&(r.현장조사||r.착수일))return false;
-    if(filter==="배정완료"&&!r.현장조사&&!r.착수일)return false;
-    if(search&&!`${r.학교명}${r.시설명}${r.지역}`.includes(search))return false;
-    for(const col of filterCols){const s=colFilters[col];if(s&&s.size>0&&!s.has(r[col]))return false;}
-    return true;
-  });
-  const activeFC=filterCols.filter(c=>isFiltered(c)).length;
-
-  const colHeaders=[
-    {key:"no",label:"No."},{key:"점검종류",label:"점검종류",f:true},{key:"지역",label:"지역",f:true},
-    {key:"학교명",label:"학교명",f:true},{key:"시설명",label:"시설명"},{key:"동수",label:"동수"},
-    {key:"연면적",label:"연면적(㎡)"},{key:"현장조사",label:"현장조사"},{key:"착수일",label:"착수일"},
-    {key:"완수일",label:"완수일"},{key:"출력기간",label:"출력기간"},{key:"FMS",label:"FMS"},
-    {key:"특기사항",label:"특기사항"},{key:"납품방법",label:"납품방법",f:true},
-    {key:"lead",label:"담당"},{key:"진행단계",label:"진행단계"},{key:"상태",label:"상태"},
-  ];
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:12}} onClick={()=>setOpenDD(null)}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:260}}>
-          <div style={{position:"relative",flex:1,maxWidth:320}}>
-            <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"#94a3b8"}}>🔍</span>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="학교명, 시설명, 지역 검색..."
-              style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:10,padding:"9px 12px 9px 34px",fontSize:13,boxSizing:"border-box",outline:"none"}}/>
-            {search&&<button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#94a3b8",fontSize:16}}>✕</button>}
-          </div>
-          <div style={{display:"flex",gap:6}}>
-            {[["전체",rows.length],["미배정",unscheduled],["배정완료",rows.length-unscheduled]].map(([l,n])=>(
-              <button key={l} onClick={e=>{e.stopPropagation();setFilter(l);}} style={{padding:"7px 12px",borderRadius:20,border:"1px solid",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",borderColor:filter===l?"#1d4ed8":"#e5e7eb",background:filter===l?"#1d4ed8":"#fff",color:filter===l?"#fff":"#6b7280"}}>{l} {n}</button>
-            ))}
-          </div>
-        </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          {activeFC>0&&<button onClick={()=>setColFilters({})} style={{padding:"7px 12px",borderRadius:8,border:"1px solid #fca5a5",background:"#fff1f2",color:"#dc2626",fontSize:12,cursor:"pointer",fontWeight:600}}>필터 초기화 ({activeFC})</button>}
-          {isAdmin&&<button onClick={()=>fileRef.current.click()} style={{padding:"7px 14px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>📤 엑셀 업로드</button>}
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
-        </div>
-      </div>
-      <div style={{fontSize:12,color:"#64748b"}}>전체 {rows.length}건 중 <strong style={{color:"#1d4ed8"}}>{filtered.length}건</strong> 표시</div>
-      {unscheduled>0&&<div style={{background:"#fff7ed",borderRadius:10,padding:"8px 14px",border:"1px solid #fed7aa",fontSize:12,color:"#c2410c"}}>⚠️ 일정 미배정 <strong>{unscheduled}건</strong></div>}
-
-      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"auto",position:"relative"}} onClick={e=>e.stopPropagation()}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1200}}>
-          <thead><tr style={{background:"#0f172a",color:"#fff"}}>
-            {colHeaders.map(h=>(
-              <th key={h.key} style={{padding:0,textAlign:"left",fontWeight:600,fontSize:10,whiteSpace:"nowrap",borderRight:"1px solid #1e293b",position:"relative"}}>
-                {h.f?(
-                  <button onClick={e=>{e.stopPropagation();setOpenDD(openDD===h.key?null:h.key);setDropSearch("");}} style={{width:"100%",padding:"10px",background:"none",border:"none",cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",gap:5,fontWeight:600,fontSize:10,textAlign:"left"}}>
-                    {h.label}<span style={{marginLeft:"auto",fontSize:9,background:isFiltered(h.key)?"#f97316":"rgba(255,255,255,.15)",borderRadius:4,padding:"1px 5px",flexShrink:0}}>{isFiltered(h.key)?`${colFilters[h.key].size}✓`:"▼"}</span>
-                  </button>
-                ):<div style={{padding:"10px"}}>{h.label}</div>}
-                {h.f&&openDD===h.key&&(
-                  <div style={{position:"absolute",top:"100%",left:0,zIndex:1000,background:"#fff",border:"1px solid #e5e7eb",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,.15)",minWidth:180,color:"#1e293b"}}>
-                    <div style={{padding:"8px 10px",borderBottom:"1px solid #f1f5f9"}}><input value={dropSearch} onChange={e=>setDropSearch(e.target.value)} placeholder="검색..." style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:6,padding:"5px 8px",fontSize:11,boxSizing:"border-box"}} autoFocus/></div>
-                    <div style={{padding:"4px 0",maxHeight:200,overflowY:"auto"}}>
-                      <button onClick={()=>clearCol(h.key)} style={{width:"100%",padding:"6px 12px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:11,color:"#94a3b8",display:"flex",alignItems:"center",gap:6}}><span style={{width:14,height:14,border:"1px solid #d1d5db",borderRadius:3,display:"inline-block"}}/>전체 해제</button>
-                      {uniqueVals(h.key).filter(v=>!dropSearch||v.includes(dropSearch)).map(v=>{
-                        const checked=colFilters[h.key]&&colFilters[h.key].has(v);
-                        return <button key={v} onClick={()=>toggleCol(h.key,v)} style={{width:"100%",padding:"6px 12px",background:checked?"#eff6ff":"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:11,color:"#1e293b",display:"flex",alignItems:"center",gap:6}}>
-                          <span style={{width:14,height:14,border:`1px solid ${checked?"#1d4ed8":"#d1d5db"}`,borderRadius:3,display:"inline-flex",alignItems:"center",justifyContent:"center",background:checked?"#1d4ed8":"#fff",color:"#fff",fontSize:9,flexShrink:0}}>{checked?"✓":""}</span>
-                          {v}<span style={{marginLeft:"auto",fontSize:10,color:"#94a3b8"}}>{rows.filter(r=>r[h.key]===v).length}</span>
-                        </button>;
-                      })}
-                    </div>
-                  </div>
-                )}
-              </th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {filtered.map((r,i)=>{
-              const d=diffDays(r.완수일),ug=urgColor(d);
-              const hasSchedule=!!(r.현장조사||r.착수일),st=r.status||"예정";
-              return (
-                <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
-                  <td style={{padding:"9px 10px",color:"#94a3b8",borderRight:"1px solid #f1f5f9"}}>{r.no}</td>
-                  <td style={{padding:"9px 10px",borderRight:"1px solid #f1f5f9"}}><span style={{background:"#ede9fe",color:"#7c3aed",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{r.점검종류}</span></td>
-                  <td style={{padding:"9px 10px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.지역}</td>
-                  <td style={{padding:"9px 10px",fontWeight:700,borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}><button onClick={()=>setDetailModal(r)} style={{background:"none",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,color:"#1d4ed8",padding:0,textDecoration:"underline"}}>{r.학교명}</button></td>
-                  <td style={{padding:"9px 10px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.시설명}</td>
-                  <td style={{padding:"9px 10px",color:"#374151",textAlign:"center",borderRight:"1px solid #f1f5f9"}}>{r.동수}</td>
-                  <td style={{padding:"9px 10px",color:"#374151",textAlign:"right",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
-                  <td style={{padding:"9px 10px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.현장조사?<span style={{color:"#1d4ed8",fontWeight:600}}>{r.현장조사}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
-                  <td style={{padding:"9px 10px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.착수일||<span style={{color:"#d1d5db"}}>-</span>}</td>
-                  <td style={{padding:"9px 10px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.완수일?<span style={{color:"#ea580c",fontWeight:600}}>{r.완수일}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
-                  <td style={{padding:"9px 10px",textAlign:"center",borderRight:"1px solid #f1f5f9"}}><span style={{background:ug.bg,color:ug.color,borderRadius:20,padding:"2px 9px",fontWeight:700,fontSize:11}}>{dLabel(d)}</span></td>
-                  <td style={{padding:"9px 10px",color:"#64748b",fontSize:10,borderRight:"1px solid #f1f5f9",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={r.FMS}>{r.FMS||"-"}</td>
-                  <td style={{padding:"9px 10px",borderRight:"1px solid #f1f5f9",maxWidth:100}}>{r.특기사항?<span style={{background:"#fff7ed",color:"#92400e",borderRadius:6,padding:"2px 6px",fontSize:10}}>{r.특기사항}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
-                  <td style={{padding:"9px 10px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}><span style={{fontSize:11,fontWeight:600,color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed"}}>{r.납품방법==="현장납품"?"🏫 현장":"📦 택배"}</span></td>
-                  <td style={{padding:"9px 10px",borderRight:"1px solid #f1f5f9"}}>{r.lead?<div style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={20}/><span style={{fontSize:11}}>{r.lead}</span></div>:<span style={{color:"#d1d5db",fontSize:11}}>-</span>}</td>
-                  <td style={{padding:"9px 10px",borderRight:"1px solid #f1f5f9",minWidth:130}}><PBar step={r.progress||0} compact/></td>
-                  <td style={{padding:"9px 10px",whiteSpace:"nowrap"}}>
-                    {hasSchedule?<Badge label={st} s={SS[st]||SS["예정"]}/>:
-                      isAdmin?<button onClick={()=>{setSchedModal(r);setSForm({lead:members[0]||"",status:"예정"});}} style={{padding:"4px 10px",borderRadius:8,border:"none",background:"#f97316",color:"#fff",fontSize:10,fontWeight:600,cursor:"pointer"}}>일정배정</button>
-                      :<span style={{fontSize:11,color:"#94a3b8"}}>미배정</span>}
-                  </td>
-                </tr>
-              );
-            })}
-            {filtered.length===0&&<tr><td colSpan={17} style={{padding:48,textAlign:"center",color:"#94a3b8"}}>데이터 없음</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 미리보기 모달 */}
-      {preview&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
-          <div style={{background:"#fff",borderRadius:16,padding:"28px 32px",width:"90vw",maxWidth:900,maxHeight:"85vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <div><h2 style={{margin:0,fontSize:17,fontWeight:700}}>📤 업로드 미리보기</h2><p style={{margin:"4px 0 0",fontSize:12,color:"#64748b"}}>{preview.rows.length}개 항목</p></div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>setPreview(null)} style={{padding:"7px 14px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",fontSize:13,cursor:"pointer"}}>취소</button>
-                <button onClick={()=>{const updated=[...rows,...preview.rows];updateRows(updated);setPreview(null);}} style={{padding:"7px 16px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>✅ 가져오기</button>
-              </div>
-            </div>
-            <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-              <thead><tr style={{background:"#f8fafc"}}>{["No.","점검종류","지역","학교명","시설명","동수","연면적","현장조사","착수일","완수일","특기사항","납품방법"].map(h=><th key={h} style={{padding:"8px 10px",textAlign:"left",color:"#64748b",fontWeight:600,fontSize:10,whiteSpace:"nowrap",borderBottom:"2px solid #e2e8f0"}}>{h}</th>)}</tr></thead>
-              <tbody>{preview.rows.map((r,i)=><tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
-                <td style={{padding:"7px 10px",color:"#94a3b8"}}>{r.no}</td>
-                <td style={{padding:"7px 10px"}}><span style={{background:"#ede9fe",color:"#7c3aed",borderRadius:20,padding:"2px 7px",fontSize:10,fontWeight:600}}>{r.점검종류||"-"}</span></td>
-                <td style={{padding:"7px 10px",color:"#475569"}}>{r.지역||"-"}</td>
-                <td style={{padding:"7px 10px",fontWeight:700}}>{r.학교명||"-"}</td>
-                <td style={{padding:"7px 10px",color:"#475569"}}>{r.시설명||"-"}</td>
-                <td style={{padding:"7px 10px",textAlign:"center"}}>{r.동수}</td>
-                <td style={{padding:"7px 10px",textAlign:"right"}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
-                <td style={{padding:"7px 10px",color:"#1d4ed8"}}>{r.현장조사||"-"}</td>
-                <td style={{padding:"7px 10px"}}>{r.착수일||"-"}</td>
-                <td style={{padding:"7px 10px",color:"#ea580c",fontWeight:600}}>{r.완수일||"-"}</td>
-                <td style={{padding:"7px 10px"}}>{r.특기사항?<span style={{background:"#fff7ed",color:"#92400e",borderRadius:4,padding:"1px 5px",fontSize:10}}>{r.특기사항}</span>:"-"}</td>
-                <td style={{padding:"7px 10px",fontSize:11,fontWeight:600,color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed"}}>{r.납품방법==="현장납품"?"🏫":"📦"} {r.납품방법}</td>
-              </tr>)}</tbody>
-            </table></div>
-          </div>
-        </div>
-      )}
-
-      {/* 일정 배정 모달 */}
-      {schedModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
-          <div style={{background:"#fff",borderRadius:16,padding:"26px 30px",width:460,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
-            <h2 style={{margin:"0 0 14px",fontSize:16,fontWeight:700}}>일정 배정</h2>
-            <div style={{background:"#f8fafc",borderRadius:10,padding:"12px 14px",marginBottom:16,border:"1px solid #e2e8f0"}}><div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{schedModal.학교명} · {schedModal.시설명}</div>{schedModal.특기사항&&<div style={{marginTop:6,background:"#fff7ed",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#92400e"}}>⚠️ {schedModal.특기사항}</div>}</div>
-            {[["현장조사일 *","현장조사"],["착수일","착수일"],["완수일 *","완수일"]].map(([l,k])=>(
-              <div key={k} style={{marginBottom:12}}><label style={{fontSize:12,fontWeight:600,color:"#374151",display:"block",marginBottom:4}}>{l}</label><input type="date" defaultValue={schedModal[k]||""} onChange={e=>setSForm(f=>({...f,[k]:e.target.value}))} style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,boxSizing:"border-box"}}/></div>
-            ))}
-            <div style={{marginBottom:16}}><label style={{fontSize:12,fontWeight:600,color:"#374151",display:"block",marginBottom:4}}>주요 담당자</label><select value={sForm.lead} onChange={e=>setSForm(f=>({...f,lead:e.target.value}))} style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,background:"#fff"}}>{members.map(m=><option key={m}>{m}</option>)}</select></div>
-            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-              <button onClick={()=>setSchedModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",fontSize:13,cursor:"pointer"}}>취소</button>
-              <button onClick={()=>{const updated=rows.map(row=>row.id===schedModal.id?{...row,...sForm}:row);updateRows(updated);setSchedModal(null);}} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>배정 완료</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 상세 모달 */}
-      {detailModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
-          <div style={{background:"#fff",borderRadius:16,padding:"26px 30px",width:460,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><h2 style={{margin:0,fontSize:16,fontWeight:700}}>{detailModal.학교명}</h2><button onClick={()=>setDetailModal(null)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#94a3b8"}}>✕</button></div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-              {[["점검종류",detailModal.점검종류],["지역",detailModal.지역],["시설명",detailModal.시설명],["동수",`${detailModal.동수}개 동`],["연면적",`${detailModal.연면적?.toLocaleString()} ㎡`],["FMS",detailModal.FMS||"-"],["현장조사일",detailModal.현장조사||"-"],["완수일",detailModal.완수일||"-"],["납품방법",detailModal.납품방법],["담당자",detailModal.lead||"-"]].map(([l,v])=>(
-                <div key={l} style={{background:"#f8fafc",borderRadius:8,padding:"10px 12px"}}><div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>{l}</div><div style={{fontSize:13,fontWeight:600}}>{v}</div></div>
-              ))}
-            </div>
-            {detailModal.특기사항&&<div style={{background:"#fff7ed",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#92400e",marginBottom:12}}>⚠️ {detailModal.특기사항}</div>}
-            {(detailModal.현장참여||[]).length>0&&<div style={{marginBottom:12}}><div style={{fontSize:12,fontWeight:600,color:"#374151",marginBottom:8}}>현장 참여 인원</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{(detailModal.현장참여||[]).map(n=><div key={n} style={{display:"flex",alignItems:"center",gap:4,background:"#dbeafe",borderRadius:20,padding:"4px 10px"}}><Av name={n} size={18}/><span style={{fontSize:11,color:"#1d4ed8",fontWeight:600}}>{n}</span></div>)}</div></div>}
-            <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>보고서 진행 단계</div>
-            <PBar step={detailModal.progress||0}/>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── 캘린더 ── */
-function CalendarView({rows,setRows,members}) {
+/* ══════════════════════════════════════
+   일정 관리 (캘린더)
+══════════════════════════════════════ */
+function Calendar({rows}) {
   const [yr,setYr]=useState(TODAY.getFullYear());
   const [mo,setMo]=useState(TODAY.getMonth());
   const [sel,setSel]=useState(null);
-  const [attendModal,setAttendModal]=useState(null);
 
-  const toggleAttend=(rowId,name)=>{
-    const updated=rows.map(r=>{if(r.id!==rowId)return r;const cur=r.현장참여||[];const next=cur.includes(name)?cur.filter(n=>n!==name):[...cur,name];return{...r,현장참여:next};});
-    setRows(updated); fbSetRows(updated);
-    setAttendModal(prev=>prev&&prev.id===rowId?updated.find(x=>x.id===rowId):prev);
-  };
-
-  const first=new Date(yr,mo,1).getDay(),dim=new Date(yr,mo+1,0).getDate();
-  const weeks=[];let d=1-first;
+  const first=new Date(yr,mo,1).getDay(), dim=new Date(yr,mo+1,0).getDate();
+  const weeks=[]; let d=1-first;
   while(d<=dim){const w=[];for(let i=0;i<7;i++,d++)w.push(d>0&&d<=dim?d:null);weeks.push(w);}
+
+  /* 현장조사일(파랑), 완수일(주황) 매핑 */
   const evMap={};
   rows.forEach(r=>{
-    if(r.현장조사){const dd=new Date(r.현장조사);if(dd.getFullYear()===yr&&dd.getMonth()===mo){const k=dd.getDate();if(!evMap[k])evMap[k]={s:[],r:[]};evMap[k].s.push(r);}}
-    if(r.완수일){const dd=new Date(r.완수일);if(dd.getFullYear()===yr&&dd.getMonth()===mo){const k=dd.getDate();if(!evMap[k])evMap[k]={s:[],r:[]};evMap[k].r.push(r);}}
+    const add=(dateStr,type)=>{
+      if(!dateStr)return;
+      const dd=new Date(dateStr);
+      if(dd.getFullYear()===yr&&dd.getMonth()===mo){
+        const k=dd.getDate();
+        if(!evMap[k])evMap[k]={s:[],r:[]};
+        evMap[k][type].push(r);
+      }
+    };
+    add(r.현장조사,"s");
+    add(r.완수일,"r");
   });
+
   const mn=["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
   const dn=["일","월","화","수","목","금","토"];
   const pM=()=>{mo===0?(setMo(11),setYr(y=>y-1)):setMo(m=>m-1);setSel(null);};
   const nM=()=>{mo===11?(setMo(0),setYr(y=>y+1)):setMo(m=>m+1);setSel(null);};
   const sev=sel?evMap[sel]||{s:[],r:[]}:{s:[],r:[]};
 
-  return (
-    <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:18}}>
+  return(
+    <div style={{display:"grid",gridTemplateColumns:"1fr 290px",gap:18}}>
       <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",borderBottom:"1px solid #f1f5f9"}}>
           <button onClick={pM} style={{background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",cursor:"pointer"}}>‹</button>
@@ -637,154 +530,280 @@ function CalendarView({rows,setRows,members}) {
             {wk.map((d,di)=>{
               const isT=d&&yr===TODAY.getFullYear()&&mo===TODAY.getMonth()&&d===TODAY.getDate();
               const ev=d?evMap[d]||{s:[],r:[]}:{s:[],r:[]};
-              return <div key={di} onClick={()=>d&&setSel(d===sel?null:d)} style={{minHeight:84,padding:"6px 5px",borderLeft:di>0?"1px solid #f1f5f9":"none",background:d===sel?"#eff6ff":"transparent",cursor:d?"pointer":"default"}}>
+              return<div key={di} onClick={()=>d&&setSel(d===sel?null:d)}
+                style={{minHeight:84,padding:"6px 5px",borderLeft:di>0?"1px solid #f1f5f9":"none",background:d===sel?"#eff6ff":"transparent",cursor:d?"pointer":"default"}}>
                 {d&&<>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                     <div style={{width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isT?"#1d4ed8":"transparent",color:isT?"#fff":di===0?"#ef4444":di===6?"#3b82f6":"#1e293b",fontSize:12,fontWeight:isT?700:400}}>{d}</div>
-                    <div style={{display:"flex",gap:2}}>{ev.s.length>0&&<div style={{width:7,height:7,borderRadius:"50%",background:"#3b82f6"}}/>}{ev.r.length>0&&<div style={{width:7,height:7,borderRadius:"50%",background:"#f97316"}}/>}</div>
+                    <div style={{display:"flex",gap:2}}>
+                      {ev.s.length>0&&<div style={{width:7,height:7,borderRadius:"50%",background:"#3b82f6"}}/>}
+                      {ev.r.length>0&&<div style={{width:7,height:7,borderRadius:"50%",background:"#f97316"}}/>}
+                    </div>
                   </div>
                   {ev.s.slice(0,1).map(r=><div key={`s${r.id}`} style={{fontSize:9,padding:"2px 4px",borderRadius:3,background:"#dbeafe",color:"#1d4ed8",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:1}}>🔵 {r.학교명}</div>)}
                   {ev.r.slice(0,1).map(r=><div key={`r${r.id}`} style={{fontSize:9,padding:"2px 4px",borderRadius:3,background:"#ffedd5",color:"#c2410c",fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:1}}>🟠 {r.학교명}</div>)}
-                  {(ev.s.length+ev.r.length)>2&&<div style={{fontSize:9,color:"#94a3b8"}}>+{ev.s.length+ev.r.length-2}</div>}
+                  {(ev.s.length+ev.r.length)>2&&<div style={{fontSize:9,color:"#94a3b8"}}>+{ev.s.length+ev.r.length-2}건</div>}
                 </>}
               </div>;
             })}
           </div>
         ))}
       </div>
-      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",padding:18,overflowY:"auto"}}>
-        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>{sel?`${mo+1}월 ${sel}일`:"날짜 클릭"}</div>
-        {!sel&&<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",marginTop:36}}>날짜를 선택하세요</div>}
-        {sel&&sev.s.length===0&&sev.r.length===0&&<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",marginTop:36}}>일정 없음</div>}
-        {sev.s.map(r=>{
-          const attend=r.현장참여||[];
-          return <div key={r.id} style={{background:"#eff6ff",borderRadius:8,padding:"10px 12px",marginBottom:8,borderLeft:"3px solid #3b82f6"}}>
-            <div style={{fontSize:11,color:"#3b82f6",fontWeight:700,marginBottom:3}}>🔵 현장조사</div>
-            <div style={{fontWeight:600,fontSize:12,marginBottom:6}}>{r.학교명} · {r.시설명}</div>
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:4}}>주요 담당자</div>
-            {r.lead&&<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8}}><Av name={r.lead} size={18}/><span style={{fontSize:11,fontWeight:600}}>{r.lead}</span></div>}
-            <div style={{fontSize:10,color:"#94a3b8",marginBottom:6}}>현장 참여 인원 ({attend.length}명)</div>
-            {attend.length===0?<div style={{fontSize:11,color:"#cbd5e1",marginBottom:8}}>참여 인원 미입력</div>:
-              <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{attend.map(n=><div key={n} style={{display:"flex",alignItems:"center",gap:4,background:"#dbeafe",borderRadius:20,padding:"3px 10px"}}><Av name={n} size={16}/><span style={{fontSize:11,color:"#1d4ed8",fontWeight:600}}>{n}</span></div>)}</div>}
-            <button onClick={()=>setAttendModal(rows.find(x=>x.id===r.id)||r)} style={{width:"100%",padding:"6px",borderRadius:8,border:"1px dashed #93c5fd",background:"#f0f9ff",color:"#1d4ed8",fontSize:11,fontWeight:600,cursor:"pointer"}}>✏️ 참여 인원 수정</button>
-          </div>;
-        })}
-        {sev.r.map(r=><div key={r.id} style={{background:"#fff7ed",borderRadius:8,padding:"10px 12px",marginBottom:8,borderLeft:"3px solid #f97316"}}>
-          <div style={{fontSize:11,color:"#ea580c",fontWeight:700,marginBottom:3}}>🟠 보고서 완수일</div>
-          <div style={{fontWeight:600,fontSize:12}}>{r.학교명} · {r.시설명}</div>
-          <div style={{fontSize:11,color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed",marginTop:3}}>{r.납품방법==="현장납품"?"🏫 현장납품":"📦 택배납품"}</div>
-          <div style={{marginTop:6}}><PBar step={r.progress||0} compact/></div>
-        </div>)}
-      </div>
 
-      {/* 참여 인원 모달 */}
-      {attendModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
-          <div style={{background:"#fff",borderRadius:16,padding:"26px 30px",width:380,boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><h2 style={{margin:0,fontSize:16,fontWeight:700}}>현장 참여 인원</h2><button onClick={()=>setAttendModal(null)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#94a3b8"}}>✕</button></div>
-            <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>{attendModal.학교명} · {attendModal.현장조사}</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
-              {members.map((m,i)=>{
-                const cur=(rows.find(x=>x.id===attendModal.id)?.현장참여)||[];
-                const checked=cur.includes(m);
-                return <button key={m} onClick={()=>toggleAttend(attendModal.id,m)}
-                  style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:10,border:`2px solid ${checked?"#1d4ed8":"#e5e7eb"}`,background:checked?"#eff6ff":"#fff",cursor:"pointer",textAlign:"left"}}>
-                  <div style={{width:32,height:32,borderRadius:"50%",background:mColor(m,i),color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:14}}>{m[0]}</div>
-                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600,color:checked?"#1d4ed8":"#374151"}}>{m}</div>{m===attendModal.lead&&<div style={{fontSize:10,color:"#f97316"}}>주요 담당자</div>}</div>
-                  <div style={{width:20,height:20,borderRadius:"50%",border:`2px solid ${checked?"#1d4ed8":"#d1d5db"}`,background:checked?"#1d4ed8":"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff",flexShrink:0}}>{checked?"✓":""}</div>
-                </button>;
-              })}
-            </div>
-            <button onClick={()=>setAttendModal(null)} style={{width:"100%",padding:"11px",borderRadius:10,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>완료</button>
+      {/* 사이드 패널 */}
+      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",padding:18,overflowY:"auto"}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>{sel?`${mo+1}월 ${sel}일`:"날짜를 클릭하세요"}</div>
+        {!sel&&<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",marginTop:40}}>날짜를 선택하면<br/>일정이 표시됩니다</div>}
+        {sel&&sev.s.length===0&&sev.r.length===0&&<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",marginTop:40}}>이 날 일정 없음</div>}
+
+        {sev.s.map(r=>(
+          <div key={r.id} style={{background:"#eff6ff",borderRadius:8,padding:"12px",marginBottom:8,borderLeft:"3px solid #3b82f6"}}>
+            <div style={{fontSize:11,color:"#3b82f6",fontWeight:700,marginBottom:4}}>🔵 현장조사</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{r.학교명}</div>
+            <div style={{fontSize:11,color:"#64748b"}}>{r.시설명} · {r.지역}</div>
+            {r.lead&&<div style={{display:"flex",alignItems:"center",gap:5,marginTop:6}}><Av name={r.lead} size={18}/><span style={{fontSize:11,fontWeight:600}}>{r.lead}</span></div>}
+            <div style={{marginTop:8}}><PBar step={r.progress||0} compact/></div>
           </div>
-        </div>
-      )}
+        ))}
+        {sev.r.map(r=>{
+          const d=diffDays(r.완수일);
+          return(
+            <div key={r.id} style={{background:"#fff7ed",borderRadius:8,padding:"12px",marginBottom:8,borderLeft:"3px solid #f97316"}}>
+              <div style={{fontSize:11,color:"#ea580c",fontWeight:700,marginBottom:4}}>🟠 보고서 완수일</div>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{r.학교명}</div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{r.납품방법==="현장납품"?"🏫 현장납품":"📦 택배납품"}</div>
+              <span style={{background:urgBg(d),color:urgC(d),borderRadius:20,padding:"2px 10px",fontWeight:700,fontSize:12}}>{dLabel(d)}</span>
+              <div style={{marginTop:8}}><PBar step={r.progress||0} compact/></div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-/* ── 팀 채팅 (Firebase 실시간) ── */
-function TeamChat({user, members}) {
-  const [messages,setMessages]=useState([]);
-  const [input,setInput]=useState("");
-  const [activeRoom,setActiveRoom]=useState("전체");
-  const bottomRef=useRef();
-  const rooms=["전체","현장조사","보고서작성","공지사항"];
-  const roomColors={전체:"#1d4ed8",현장조사:"#16a34a",보고서작성:"#7c3aed",공지사항:"#dc2626"};
+/* ══════════════════════════════════════
+   팀 채팅
+══════════════════════════════════════ */
+function Chat({user, members}) {
+  const [msgs,   setMsgs]   = useState([]);
+  const [input,  setInput]  = useState("");
+  const [room,   setRoom]   = useState("전체");
+  const bottomRef = useRef();
+  const rooms = ["전체","현장조사","보고서작성","공지사항"];
+  const rColors = {전체:"#1d4ed8",현장조사:"#16a34a",보고서작성:"#7c3aed",공지사항:"#dc2626"};
 
   useEffect(()=>{
-    const ref=db.ref(`chat/${activeRoom}`);
-    ref.on("value", snap=>{
-      const data=snap.val();
-      if(data){
-        const msgs=Object.values(data).sort((a,b)=>a.id-b.id);
-        setMessages(msgs);
-      } else {
-        setMessages([]);
-      }
+    const ref=db.ref(`chat/${room}`);
+    ref.on("value",snap=>{
+      const d=snap.val();
+      setMsgs(d?Object.values(d).sort((a,b)=>a.id-b.id):[]);
     });
     return()=>ref.off();
-  },[activeRoom]);
+  },[room]);
 
-  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[messages]);
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[msgs]);
 
   const send=()=>{
     if(!input.trim())return;
-    const msg={id:Date.now(),sender:user.name,text:input.trim(),room:activeRoom,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric"})};
-    db.ref(`chat/${activeRoom}/${msg.id}`).set(msg);
+    const msg={id:Date.now(),sender:user.name,text:input.trim(),room,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric"})};
+    db.ref(`chat/${room}/${msg.id}`).set(msg);
     setInput("");
   };
 
-  const deleteMsg=id=>{
-    db.ref(`chat/${activeRoom}/${id}`).remove();
-  };
+  const del=id=>db.ref(`chat/${room}/${id}`).remove();
 
-  const grouped=[];let lastDate=null;
-  messages.forEach(m=>{if(m.date!==lastDate){grouped.push({type:"date",date:m.date});lastDate=m.date;}grouped.push({type:"msg",...m});});
+  const grouped=[]; let lastDate=null;
+  msgs.forEach(m=>{if(m.date!==lastDate){grouped.push({type:"date",date:m.date});lastDate=m.date;}grouped.push({type:"msg",...m});});
 
-  return (
-    <div style={{display:"grid",gridTemplateColumns:"180px 1fr",gap:16,height:"calc(100vh - 160px)"}}>
-      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",padding:14,display:"flex",flexDirection:"column",gap:6}}>
-        <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",marginBottom:6,padding:"0 4px"}}>채팅방</div>
-        {rooms.map(r=><button key={r} onClick={()=>setActiveRoom(r)} style={{padding:"10px 12px",borderRadius:10,border:"none",cursor:"pointer",textAlign:"left",fontWeight:activeRoom===r?700:500,fontSize:13,background:activeRoom===r?`${roomColors[r]}18`:"transparent",color:activeRoom===r?roomColors[r]:"#475569",display:"flex",alignItems:"center",gap:8}}><span style={{width:8,height:8,borderRadius:"50%",background:roomColors[r],flexShrink:0}}/>{r}</button>)}
+  return(
+    <div style={{display:"grid",gridTemplateColumns:"170px 1fr",gap:16,height:"calc(100vh - 160px)"}}>
+      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",padding:12,display:"flex",flexDirection:"column",gap:4}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:6,padding:"0 4px"}}>채팅방</div>
+        {rooms.map(r=><button key={r} onClick={()=>setRoom(r)} style={{padding:"9px 10px",borderRadius:10,border:"none",cursor:"pointer",textAlign:"left",fontWeight:room===r?700:500,fontSize:13,background:room===r?`${rColors[r]}18`:"transparent",color:room===r?rColors[r]:"#475569",display:"flex",alignItems:"center",gap:8}}><span style={{width:7,height:7,borderRadius:"50%",background:rColors[r],flexShrink:0}}/>{r}</button>)}
         <div style={{marginTop:"auto",padding:"10px 4px",borderTop:"1px solid #f1f5f9"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:28,height:28,borderRadius:"50%",background:MC[user.name]||"#1d4ed8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13}}>{user.name[0]}</div>
-            <div><div style={{fontSize:12,fontWeight:700}}>{user.name}</div><div style={{fontSize:10,color:user.role==="admin"?"#f97316":"#22c55e"}}>● {user.role==="admin"?"관리자":"팀원"} · 실시간</div></div>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <div style={{width:26,height:26,borderRadius:"50%",background:MC[user.name]||"#1d4ed8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:12}}>{user.name[0]}</div>
+            <div><div style={{fontSize:11,fontWeight:700}}>{user.name}</div><div style={{fontSize:9,color:user.role==="admin"?"#f97316":"#22c55e"}}>● {user.role==="admin"?"관리자":"팀원"}</div></div>
           </div>
         </div>
       </div>
+
       <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-        <div style={{padding:"14px 20px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",gap:10,background:`${roomColors[activeRoom]}08`}}>
-          <span style={{width:10,height:10,borderRadius:"50%",background:roomColors[activeRoom]}}/><span style={{fontWeight:700,fontSize:15}}>{activeRoom}</span>
-          <span style={{fontSize:12,color:"#94a3b8",marginLeft:4}}>{messages.length}개 메시지</span>
-          <span style={{marginLeft:"auto",fontSize:11,color:"#22c55e",background:"#f0fdf4",borderRadius:20,padding:"2px 10px",border:"1px solid #86efac"}}>🟢 실시간 연결됨</span>
+        <div style={{padding:"12px 18px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",gap:8,background:`${rColors[room]}08`}}>
+          <span style={{width:9,height:9,borderRadius:"50%",background:rColors[room]}}/><span style={{fontWeight:700,fontSize:14}}>{room}</span>
+          <span style={{fontSize:11,color:"#94a3b8",marginLeft:4}}>{msgs.length}개 메시지</span>
+          <span style={{marginLeft:"auto",fontSize:11,color:"#22c55e",background:"#f0fdf4",borderRadius:20,padding:"2px 9px",border:"1px solid #86efac"}}>🟢 실시간</span>
         </div>
-        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:2,background:"#fafafa"}}>
-          {grouped.length===0&&<div style={{textAlign:"center",marginTop:60,color:"#94a3b8"}}><div style={{fontSize:36,marginBottom:10}}>💬</div><div style={{fontSize:14,fontWeight:600}}>아직 메시지가 없어요</div><div style={{fontSize:12,marginTop:4}}>팀원과 대화를 시작해보세요!</div></div>}
+        <div style={{flex:1,overflowY:"auto",padding:"14px 18px",display:"flex",flexDirection:"column",gap:2,background:"#fafafa"}}>
+          {grouped.length===0&&<div style={{textAlign:"center",marginTop:60,color:"#94a3b8"}}><div style={{fontSize:32,marginBottom:10}}>💬</div><div style={{fontSize:14,fontWeight:600}}>아직 메시지가 없어요</div></div>}
           {grouped.map((item,i)=>{
-            if(item.type==="date")return <div key={`d${i}`} style={{textAlign:"center",margin:"16px 0 8px"}}><span style={{background:"#e2e8f0",color:"#64748b",borderRadius:20,padding:"3px 14px",fontSize:11}}>{item.date}</span></div>;
+            if(item.type==="date") return <div key={`d${i}`} style={{textAlign:"center",margin:"14px 0 6px"}}><span style={{background:"#e2e8f0",color:"#64748b",borderRadius:20,padding:"3px 12px",fontSize:11}}>{item.date}</span></div>;
             const isMe=item.sender===user.name, color=MC[item.sender]||"#94a3b8";
-            return <div key={item.id} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,alignItems:"flex-end",marginBottom:6}}>
-              {!isMe&&<div style={{width:30,height:30,borderRadius:"50%",background:color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,flexShrink:0}}>{item.sender[0]}</div>}
+            return <div key={item.id} style={{display:"flex",flexDirection:isMe?"row-reverse":"row",gap:8,alignItems:"flex-end",marginBottom:5}}>
+              {!isMe&&<div style={{width:28,height:28,borderRadius:"50%",background:color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:12,flexShrink:0}}>{item.sender[0]}</div>}
               <div style={{maxWidth:"65%"}}>
-                {!isMe&&<div style={{fontSize:11,color:"#64748b",marginBottom:3,marginLeft:2}}>{item.sender}{item.sender==="관리자"&&<span style={{marginLeft:5,background:"#fff7ed",color:"#f97316",borderRadius:20,padding:"1px 7px",fontSize:10}}>관리자</span>}</div>}
-                <div style={{display:"flex",alignItems:"flex-end",gap:6,flexDirection:isMe?"row-reverse":"row"}}>
-                  <div style={{background:isMe?color:"#fff",color:isMe?"#fff":"#1e293b",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"10px 14px",fontSize:13,lineHeight:1.5,boxShadow:"0 1px 3px rgba(0,0,0,.08)",wordBreak:"break-word"}}>{item.text}</div>
+                {!isMe&&<div style={{fontSize:11,color:"#64748b",marginBottom:2,marginLeft:2}}>{item.sender}{item.sender==="관리자"&&<span style={{marginLeft:4,background:"#fff7ed",color:"#f97316",borderRadius:20,padding:"1px 6px",fontSize:9}}>관리자</span>}</div>}
+                <div style={{display:"flex",alignItems:"flex-end",gap:5,flexDirection:isMe?"row-reverse":"row"}}>
+                  <div style={{background:isMe?color:"#fff",color:isMe?"#fff":"#1e293b",borderRadius:isMe?"16px 16px 4px 16px":"16px 16px 16px 4px",padding:"9px 13px",fontSize:13,lineHeight:1.5,boxShadow:"0 1px 3px rgba(0,0,0,.08)",wordBreak:"break-word"}}>{item.text}</div>
                   <div style={{fontSize:10,color:"#94a3b8",flexShrink:0}}>{item.time}</div>
-                  {(isMe||user.role==="admin")&&<button onClick={()=>deleteMsg(item.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#cbd5e1",fontSize:12,padding:"0 2px"}}>🗑</button>}
+                  {(isMe||user.role==="admin")&&<button onClick={()=>del(item.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#cbd5e1",fontSize:11,padding:0}}>🗑</button>}
                 </div>
               </div>
             </div>;
           })}
           <div ref={bottomRef}/>
         </div>
-        <div style={{padding:"12px 16px",borderTop:"1px solid #f1f5f9",background:"#fff"}}>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
-              placeholder={`${activeRoom} 채팅방에 메시지 입력... (Enter)`}
-              style={{flex:1,border:"1px solid #e5e7eb",borderRadius:12,padding:"10px 16px",fontSize:13,outline:"none",background:"#f8fafc"}}/>
-            <button onClick={send} disabled={!input.trim()} style={{padding:"10px 20px",borderRadius:12,border:"none",background:input.trim()?roomColors[activeRoom]:"#e5e7eb",color:"#fff",fontSize:13,fontWeight:700,cursor:input.trim()?"pointer":"default"}}>전송</button>
+        <div style={{padding:"10px 14px",borderTop:"1px solid #f1f5f9",background:"#fff",display:"flex",gap:8}}>
+          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+            placeholder={`${room} 채팅방에 입력... (Enter 전송)`}
+            style={{flex:1,border:"1px solid #e5e7eb",borderRadius:12,padding:"9px 14px",fontSize:13,outline:"none",background:"#f8fafc"}}/>
+          <button onClick={send} disabled={!input.trim()} style={{padding:"9px 18px",borderRadius:12,border:"none",background:input.trim()?rColors[room]:"#e5e7eb",color:"#fff",fontSize:13,fontWeight:700,cursor:input.trim()?"pointer":"default"}}>전송</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════
+   매출 현황
+══════════════════════════════════════ */
+function Revenue({rows, setRows}) {
+  const [editId,setEditId]=useState(null);
+  const [editVal,setEditVal]=useState("");
+  const total=rows.reduce((s,r)=>s+(r.계약금액||0),0);
+  const pct=(v,t)=>t>0?Math.round(v/t*100):0;
+  const saveEdit=id=>{
+    const n=parseInt(editVal.replace(/,/g,""))||0;
+    const updated=rows.map(row=>row.id===id?{...row,계약금액:n}:row);
+    setRows(updated); fbRows(updated); setEditId(null); setEditVal("");
+  };
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{background:"#eff6ff",borderRadius:10,padding:"10px 16px",border:"1px solid #bfdbfe",fontSize:12,color:"#1d4ed8"}}>🔐 <strong>관리자 전용</strong></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+        {[{l:"총 계약금액",v:total,c:"#1d4ed8"},{l:"납품 완료",v:rows.filter(r=>r.progress===6).reduce((s,r)=>s+(r.계약금액||0),0),c:"#16a34a"},{l:"진행중",v:rows.filter(r=>r.progress>0&&r.progress<6).reduce((s,r)=>s+(r.계약금액||0),0),c:"#7c3aed"},{l:"미착수",v:rows.filter(r=>r.progress===0).reduce((s,r)=>s+(r.계약금액||0),0),c:"#94a3b8"}].map(k=>(
+          <div key={k.l} style={{background:"#fff",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderTop:`3px solid ${k.c}`}}>
+            <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{k.l}</div>
+            <div style={{fontSize:18,fontWeight:800,color:k.c,marginBottom:4}}>{won(k.v)}</div>
+            {total>0&&<div style={{height:4,background:"#f1f5f9",borderRadius:2}}><div style={{height:4,background:k.c,borderRadius:2,width:`${pct(k.v,total)}%`}}/></div>}
+          </div>
+        ))}
+      </div>
+      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
+        <div style={{padding:"14px 18px",borderBottom:"1px solid #f1f5f9",fontWeight:700,fontSize:14}}>📋 현장별 계약금액 <span style={{fontSize:12,color:"#64748b",fontWeight:400}}>· 클릭하여 수정</span></div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead><tr style={{background:"#f8fafc"}}>
+            {["학교명","시설명","담당","완수일","진행","계약금액"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#64748b",fontWeight:600,fontSize:11,borderBottom:"2px solid #e2e8f0"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {rows.map((r,i)=>(
+              <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
+                <td style={{padding:"10px 14px",fontWeight:600}}>{r.학교명}</td>
+                <td style={{padding:"10px 14px",color:"#64748b"}}>{r.시설명}</td>
+                <td style={{padding:"10px 14px"}}>{r.lead?<div style={{display:"flex",alignItems:"center",gap:5}}><Av name={r.lead} size={18}/><span>{r.lead}</span></div>:"-"}</td>
+                <td style={{padding:"10px 14px",color:"#ea580c"}}>{r.완수일||"-"}</td>
+                <td style={{padding:"10px 14px",minWidth:120}}><PBar step={r.progress||0} compact/></td>
+                <td style={{padding:"10px 14px",minWidth:140}}>
+                  {editId===r.id?(
+                    <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                      <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEdit(r.id);if(e.key==="Escape")setEditId(null);}}
+                        style={{width:100,border:"2px solid #1d4ed8",borderRadius:6,padding:"4px 8px",fontSize:12,outline:"none"}}/>
+                      <button onClick={()=>saveEdit(r.id)} style={{padding:"4px 8px",borderRadius:6,border:"none",background:"#1d4ed8",color:"#fff",fontSize:11,cursor:"pointer"}}>✓</button>
+                      <button onClick={()=>setEditId(null)} style={{padding:"4px 8px",borderRadius:6,border:"1px solid #e5e7eb",background:"#fff",fontSize:11,cursor:"pointer"}}>✕</button>
+                    </div>
+                  ):(
+                    <div onClick={()=>{setEditId(r.id);setEditVal(r.계약금액?String(r.계약금액):"");}}
+                      style={{cursor:"pointer",padding:"5px 9px",borderRadius:7,border:"1px dashed",borderColor:r.계약금액?"#e2e8f0":"#fca5a5",background:r.계약금액?"#f8fafc":"#fff1f2",display:"flex",justifyContent:"space-between"}}>
+                      <span style={{fontWeight:700,color:r.계약금액?"#1d4ed8":"#f87171"}}>{r.계약금액?won(r.계약금액):"금액 입력"}</span>
+                      <span style={{fontSize:10,color:"#94a3b8"}}>✏️</span>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+            <tr style={{background:"#0f172a",color:"#fff"}}>
+              <td colSpan={5} style={{padding:"11px 14px",fontSize:13,fontWeight:700}}>합계</td>
+              <td style={{padding:"11px 14px",fontSize:14,fontWeight:800,color:"#fbbf24"}}>{won(total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════
+   설정
+══════════════════════════════════════ */
+function Settings({adminPw, setAdminPw, members, setMembers}) {
+  const [pf,setPf]=useState({cur:"",next:"",confirm:""});
+  const [pm,setPm]=useState(null);
+  const [ml,setMl]=useState([...members]);
+  const [nm,setNm]=useState("");
+  const [mm,setMm]=useState(null);
+  const [ei,setEi]=useState(null);
+  const [ev,setEv]=useState("");
+
+  const savePw=()=>{
+    if(pf.cur!==adminPw){setPm({t:"e",msg:"현재 비밀번호가 틀렸습니다."});return;}
+    if(pf.next.length<4){setPm({t:"e",msg:"4자 이상 입력해주세요."});return;}
+    if(pf.next!==pf.confirm){setPm({t:"e",msg:"새 비밀번호가 일치하지 않습니다."});return;}
+    fbSettings("adminPw",pf.next); setAdminPw(pf.next); setPf({cur:"",next:"",confirm:""});
+    setPm({t:"ok",msg:"✅ 비밀번호가 변경됐습니다."}); setTimeout(()=>setPm(null),3000);
+  };
+  const saveM=list=>{fbSettings("members",list);setMembers(list);setMl(list);setMm({t:"ok",msg:"✅ 저장됐습니다."});setTimeout(()=>setMm(null),3000);};
+  const addM=()=>{const n=nm.trim();if(!n)return;if(ml.includes(n)){setMm({t:"e",msg:"이미 존재합니다."});return;}saveM([...ml,n]);setNm("");};
+  const delM=i=>{saveM(ml.filter((_,j)=>j!==i));};
+  const saveE=i=>{const n=ev.trim();if(!n)return;saveM(ml.map((m,j)=>j===i?n:m));setEi(null);setEv("");};
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:18,maxWidth:560}}>
+      <div style={{background:"#eff6ff",borderRadius:12,padding:"12px 16px",border:"1px solid #bfdbfe",fontSize:13,color:"#1d4ed8"}}>🔐 <strong>관리자 전용</strong> — 변경사항은 팀 전체에 즉시 반영됩니다.</div>
+      {/* 비번 */}
+      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
+        <div style={{padding:"14px 20px",borderBottom:"1px solid #f1f5f9",fontWeight:700,fontSize:15}}>🔑 관리자 비밀번호 변경</div>
+        <div style={{padding:"18px 20px",display:"flex",flexDirection:"column",gap:10}}>
+          {[["현재 비밀번호","cur"],["새 비밀번호","next"],["새 비밀번호 확인","confirm"]].map(([l,k])=>(
+            <div key={k}><label style={{fontSize:12,fontWeight:600,color:"#374151",display:"block",marginBottom:4}}>{l}</label>
+            <input type="password" value={pf[k]} onChange={e=>setPf(f=>({...f,[k]:e.target.value}))} placeholder={l}
+              style={{width:"100%",border:"1px solid #e5e7eb",borderRadius:9,padding:"9px 12px",fontSize:13,boxSizing:"border-box",outline:"none"}}/></div>
+          ))}
+          {pm&&<div style={{padding:"7px 12px",borderRadius:8,background:pm.t==="ok"?"#f0fdf4":"#fef2f2",color:pm.t==="ok"?"#16a34a":"#dc2626",fontSize:12}}>{pm.msg}</div>}
+          <button onClick={savePw} style={{padding:"10px",borderRadius:10,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>비밀번호 변경</button>
+        </div>
+      </div>
+      {/* 팀원 */}
+      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
+        <div style={{padding:"14px 20px",borderBottom:"1px solid #f1f5f9",fontWeight:700,fontSize:15}}>👥 팀원 이름 관리</div>
+        <div style={{padding:"18px 20px"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
+            {ml.map((m,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",background:"#f8fafc",borderRadius:10,border:"1px solid #e2e8f0"}}>
+                <div style={{width:30,height:30,borderRadius:"50%",background:mColor(m,i),color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:13,flexShrink:0}}>{m[0]}</div>
+                {ei===i?(
+                  <div style={{display:"flex",gap:6,flex:1,alignItems:"center"}}>
+                    <input autoFocus value={ev} onChange={e=>setEv(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveE(i);if(e.key==="Escape")setEi(null);}}
+                      style={{flex:1,border:"2px solid #1d4ed8",borderRadius:7,padding:"5px 9px",fontSize:13,outline:"none"}}/>
+                    <button onClick={()=>saveE(i)} style={{padding:"5px 10px",borderRadius:7,border:"none",background:"#1d4ed8",color:"#fff",fontSize:12,cursor:"pointer",fontWeight:600}}>저장</button>
+                    <button onClick={()=>setEi(null)} style={{padding:"5px 9px",borderRadius:7,border:"1px solid #e5e7eb",background:"#fff",fontSize:12,cursor:"pointer"}}>취소</button>
+                  </div>
+                ):(
+                  <><span style={{flex:1,fontWeight:600,fontSize:13}}>{m}</span>
+                  <button onClick={()=>{setEi(i);setEv(m);}} style={{padding:"4px 9px",borderRadius:7,border:"1px solid #e2e8f0",background:"#fff",fontSize:11,cursor:"pointer"}}>✏️</button>
+                  <button onClick={()=>delM(i)} style={{padding:"4px 9px",borderRadius:7,border:"1px solid #fca5a5",background:"#fff1f2",fontSize:11,cursor:"pointer",color:"#dc2626"}}>🗑</button></>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{borderTop:"1px solid #f1f5f9",paddingTop:14}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#374151",marginBottom:7}}>팀원 추가</div>
+            <div style={{display:"flex",gap:7}}>
+              <input value={nm} onChange={e=>setNm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addM()} placeholder="이름 입력"
+                style={{flex:1,border:"1px solid #e5e7eb",borderRadius:9,padding:"9px 12px",fontSize:13,outline:"none"}}/>
+              <button onClick={addM} style={{padding:"9px 16px",borderRadius:9,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>추가</button>
+            </div>
+            {mm&&<div style={{marginTop:7,padding:"6px 10px",borderRadius:8,background:mm.t==="ok"?"#f0fdf4":"#fef2f2",color:mm.t==="ok"?"#16a34a":"#dc2626",fontSize:12}}>{mm.msg}</div>}
           </div>
         </div>
       </div>
@@ -792,166 +811,154 @@ function TeamChat({user, members}) {
   );
 }
 
-/* ── 메인 App ── */
+/* ══════════════════════════════════════
+   메인 App
+══════════════════════════════════════ */
 function App() {
   const [user,    setUser]    = useState(null);
   const [tab,     setTab]     = useState("전체 현황");
   const [rows,    setRows]    = useState([]);
-  const [adminPw, setAdminPw] = useState(DEFAULT_ADMIN_PW);
+  const [adminPw, setAdminPw] = useState(ADMIN_PW_DEFAULT);
   const [members, setMembers] = useState(DEFAULT_MEMBERS);
   const [ready,   setReady]   = useState(false);
 
-  /* ── Firebase 실시간 리스너 ── */
+  /* Firebase 실시간 연결 */
   useEffect(()=>{
-    // 3초 안에 Firebase 응답 없으면 기본값으로 진행
-    const fallback = setTimeout(()=>setReady(true), 3000);
+    const settRef = db.ref("settings");
+    const rowsRef = db.ref("rows");
 
-    // 설정 로드
-    db.ref("settings").on("value", snap=>{
-  const s=snap.val();
-  if(s){
-    if(s.adminPw) {
-      setAdminPw(s.adminPw);
-      window._adminPw = s.adminPw;
-    }
-    if(s.members) setMembers(s.members);
-  }
-  setReady(true);
-});
+    settRef.on("value", snap=>{
+      const s=snap.val();
+      if(s){
+        if(s.adminPw) setAdminPw(s.adminPw);
+        if(s.members) setMembers(Array.isArray(s.members)?s.members:Object.values(s.members));
+      }
+    });
 
-// 현장 데이터 로드
-db.ref("rows").on("value", snap=>{
-  const data=snap.val();
-  if(data){
-    setRows(Object.values(data).sort((a,b)=>a.no-b.no));
-  } else {
-    fbSetRows(INIT_ROWS);
-    setRows(INIT_ROWS);
-  }
-});
+    rowsRef.on("value", snap=>{
+      const data=snap.val();
+      if(data){
+        setRows(Object.values(data).sort((a,b)=>(a.no||0)-(b.no||0)));
+      }
+      setReady(true);
+    });
 
-    return()=>{
-      db.ref("settings").off();
-      db.ref("rows").off();
-    };
+    return()=>{ settRef.off(); rowsRef.off(); };
   },[]);
 
   const isAdmin = user?.role==="admin";
-  const updProg = (id, step) => {
-    const updated = rows.map(row=>row.id===id?{...row,progress:step}:row);
-    setRows(updated); fbSetRows(updated);
-  };
 
-  if(!ready) return (
+  const adminTabs = [
+    {icon:"▦",  label:"전체 현황"},
+    {icon:"📅", label:"일정 관리"},
+    {icon:"🚨", label:"긴급 보고서"},
+    {icon:"🏫", label:"현장 관리"},
+    {icon:"💰", label:"매출 현황", adminOnly:true},
+    {icon:"💬", label:"팀 채팅"},
+    {icon:"⚙️", label:"설정",     adminOnly:true},
+  ];
+  const memberTabs = [
+    {icon:"▦",  label:"전체 현황"},
+    {icon:"📅", label:"일정 관리"},
+    {icon:"🚨", label:"긴급 보고서"},
+    {icon:"🏫", label:"현장 관리"},
+    {icon:"💬", label:"팀 채팅"},
+  ];
+  const sideItems = isAdmin ? adminTabs : memberTabs;
+
+  const total    = rows.length;
+  const done     = rows.filter(r=>r.progress===6).length;
+  const delayed  = rows.filter(r=>r.status==="지연").length;
+  const urgCnt   = rows.filter(r=>r.progress<6&&r.완수일&&diffDays(r.완수일)<=7).length;
+
+  if(!ready) return(
     <div style={{minHeight:"100vh",background:"#0f172a",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
       <div style={{fontSize:48}}>🏫</div>
       <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>현장조사팀 대시보드</div>
       <div style={{fontSize:13,color:"#64748b"}}>Firebase 연결 중...</div>
-      <div style={{width:40,height:40,border:"3px solid #334155",borderTopColor:"#3b82f6",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{width:36,height:36,border:"3px solid #334155",borderTopColor:"#3b82f6",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
     </div>
   );
 
-  if(!user) return <LoginScreen onLogin={u=>{setUser(u);setTab("전체 현황");}} adminPw={adminPw} members={members}/>;
+  if(!user) return <Login onLogin={u=>{setUser(u);setTab("전체 현황");}} adminPw={adminPw} members={members}/>;
 
-  const adminTabs=[
-    {icon:"▦",label:"전체 현황"},{icon:"📅",label:"일정 관리"},{icon:"🚨",label:"긴급 보고서"},
-    {icon:"🏫",label:"현장 관리"},{icon:"💰",label:"매출 현황",adminOnly:true},
-    {icon:"💬",label:"팀 채팅"},{icon:"👥",label:"팀원 관리",adminOnly:true},{icon:"⚙️",label:"설정",adminOnly:true},
-  ];
-  const memberTabs=[
-    {icon:"▦",label:"전체 현황"},{icon:"📅",label:"일정 관리"},{icon:"🚨",label:"긴급 보고서"},
-    {icon:"🏫",label:"현장 관리"},{icon:"💬",label:"팀 채팅"},
-  ];
-  const sideItems=isAdmin?adminTabs:memberTabs;
-  const total=rows.length,done=rows.filter(r=>r.progress===6).length;
-  const inProg=rows.filter(r=>r.progress>0&&r.progress<6).length,delayed=rows.filter(r=>r.status==="지연").length;
-
-  return (
-    <div style={{display:"flex",height:"100vh",background:"#f8fafc",color:"#1e293b"}}>
+  return(
+    <div style={{display:"flex",height:"100vh",fontFamily:"'Apple SD Gothic Neo','Malgun Gothic',sans-serif",background:"#f8fafc",color:"#1e293b"}}>
       {/* 사이드바 */}
-      <div style={{width:210,background:"#0f172a",display:"flex",flexDirection:"column",padding:"28px 0",flexShrink:0}}>
-        <div style={{padding:"0 22px 20px",borderBottom:"1px solid #1e293b"}}>
+      <div style={{width:210,background:"#0f172a",display:"flex",flexDirection:"column",padding:"26px 0",flexShrink:0}}>
+        <div style={{padding:"0 20px 18px",borderBottom:"1px solid #1e293b"}}>
           <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>TEAM DASHBOARD</div>
-          <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>현장조사팀</div>
+          <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>현장조사팀</div>
           <div style={{marginTop:8,display:"flex",alignItems:"center",gap:7}}>
-            <div style={{width:26,height:26,borderRadius:"50%",background:isAdmin?"#f97316":MC[user.name]||"#1d4ed8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700}}>{user.name[0]}</div>
-            <div><div style={{fontSize:12,color:"#fff",fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:isAdmin?"#fb923c":"#22c55e"}}>{isAdmin?"🔐 관리자":"● 팀원"}</div></div>
+            <div style={{width:24,height:24,borderRadius:"50%",background:isAdmin?"#f97316":MC[user.name]||"#1d4ed8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{user.name[0]}</div>
+            <div><div style={{fontSize:11,color:"#fff",fontWeight:600}}>{user.name}</div><div style={{fontSize:9,color:isAdmin?"#fb923c":"#22c55e"}}>{isAdmin?"🔐 관리자":"● 팀원"}</div></div>
           </div>
         </div>
         <div style={{padding:"12px 10px",flex:1}}>
           {sideItems.map(item=>(
             <div key={item.label} onClick={()=>setTab(item.label)}
-              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,cursor:"pointer",marginBottom:3,background:tab===item.label?"#1e40af":"transparent",color:tab===item.label?"#fff":item.adminOnly?"#fb923c":"#94a3b8",fontWeight:tab===item.label?700:400,fontSize:13}}>
+              style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,cursor:"pointer",marginBottom:3,
+                background:tab===item.label?"#1e40af":"transparent",
+                color:tab===item.label?"#fff":item.adminOnly?"#fb923c":"#94a3b8",
+                fontWeight:tab===item.label?700:400,fontSize:13}}>
               <span>{item.icon}</span>{item.label}
+              {item.label==="긴급 보고서"&&urgCnt>0&&<span style={{marginLeft:"auto",background:"#ef4444",color:"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontWeight:700}}>{urgCnt}</span>}
               {item.adminOnly&&<span style={{marginLeft:"auto",fontSize:9,background:"rgba(249,115,22,.2)",color:"#fb923c",borderRadius:4,padding:"1px 5px"}}>관리자</span>}
             </div>
           ))}
         </div>
-        <div style={{padding:"14px 16px",borderTop:"1px solid #1e293b"}}>
-          <button onClick={()=>{setUser(null);setTab("전체 현황");}} style={{width:"100%",padding:"8px",borderRadius:8,border:"1px solid #334155",background:"transparent",color:"#64748b",fontSize:12,cursor:"pointer"}}>로그아웃</button>
+        <div style={{padding:"12px 14px",borderTop:"1px solid #1e293b"}}>
+          <button onClick={()=>{setUser(null);setTab("전체 현황");}} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #334155",background:"transparent",color:"#64748b",fontSize:12,cursor:"pointer"}}>로그아웃</button>
         </div>
       </div>
 
       {/* 본문 */}
-      <div style={{flex:1,overflow:"auto",padding:"26px 30px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-          <div><h1 style={{fontSize:19,fontWeight:700,margin:0}}>{tab}</h1><p style={{fontSize:12,color:"#64748b",margin:"3px 0 0"}}>현장조사팀 대시보드 · 실시간 공유 중</p></div>
+      <div style={{flex:1,overflow:"auto",padding:"24px 28px"}}>
+        <div style={{marginBottom:20}}>
+          <h1 style={{fontSize:18,fontWeight:700,margin:0}}>{tab}</h1>
+          <p style={{fontSize:11,color:"#64748b",margin:"3px 0 0"}}>현장조사팀 · 실시간 공유 중 🟢</p>
         </div>
 
+        {/* 전체 현황 */}
         {tab==="전체 현황"&&<>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
-            {[{l:"총 점검 건수",v:total,u:"건",c:"#1d4ed8"},{l:"완료",v:done,u:"건",c:"#16a34a"},{l:"진행중",v:inProg,u:"건",c:"#d97706"},{l:"지연",v:delayed,u:"건",c:"#dc2626"}].map(k=>(
-              <div key={k.l} style={{background:"#fff",borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderTop:`3px solid ${k.c}`}}>
-                <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{k.l}</div>
-                <div style={{fontSize:28,fontWeight:800,color:k.c}}>{k.v}<span style={{fontSize:13,fontWeight:500,color:"#94a3b8"}}>{k.u}</span></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+            {[{l:"총 점검 건수",v:total,u:"건",c:"#1d4ed8"},{l:"완료",v:done,u:"건",c:"#16a34a"},{l:"D-7 이내 긴급",v:urgCnt,u:"건",c:"#f97316"},{l:"지연",v:delayed,u:"건",c:"#dc2626"}].map(k=>(
+              <div key={k.l} style={{background:"#fff",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderTop:`3px solid ${k.c}`}}>
+                <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>{k.l}</div>
+                <div style={{fontSize:26,fontWeight:800,color:k.c}}>{k.v}<span style={{fontSize:13,fontWeight:500,color:"#94a3b8"}}>{k.u}</span></div>
               </div>
             ))}
           </div>
           <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"auto"}}>
-            <div style={{padding:"14px 20px",borderBottom:"1px solid #f1f5f9",fontWeight:600,fontSize:13}}>조사 목록</div>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:800}}>
-              <thead><tr style={{background:"#f8fafc"}}>{["학교명","시설명","담당","완수일","출력기간","진행","상태"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#64748b",fontWeight:600,fontSize:11,whiteSpace:"nowrap",borderBottom:"2px solid #e2e8f0"}}>{h}</th>)}</tr></thead>
-              <tbody>{rows.map((r,i)=>{const d=diffDays(r.완수일),ug=urgColor(d);return(
-                <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
-                  <td style={{padding:"10px 14px",fontWeight:600}}>{r.학교명}</td>
-                  <td style={{padding:"10px 14px",color:"#64748b"}}>{r.시설명}</td>
-                  <td style={{padding:"10px 14px"}}>{r.lead?<div style={{display:"flex",alignItems:"center",gap:5}}><Av name={r.lead} size={20}/><span>{r.lead}</span></div>:"-"}</td>
-                  <td style={{padding:"10px 14px",color:"#ea580c",whiteSpace:"nowrap"}}>{r.완수일||"-"}</td>
-                  <td style={{padding:"10px 14px"}}><span style={{background:ug.bg,color:ug.color,borderRadius:20,padding:"2px 9px",fontWeight:700,fontSize:11}}>{dLabel(d)}</span></td>
-                  <td style={{padding:"10px 14px",minWidth:140}}><PBar step={r.progress||0} compact/></td>
-                  <td style={{padding:"10px 14px"}}><Badge label={r.status||"예정"} s={SS[r.status||"예정"]}/></td>
-                </tr>
-              );})}</tbody>
-            </table>
+            <div style={{padding:"13px 18px",borderBottom:"1px solid #f1f5f9",fontWeight:600,fontSize:13}}>조사 목록</div>
+            {rows.length===0
+              ?<div style={{padding:40,textAlign:"center",color:"#94a3b8"}}>현장 관리 탭에서 엑셀을 업로드해 데이터를 추가하세요</div>
+              :<table style={{width:"100%",borderCollapse:"collapse",fontSize:12,minWidth:700}}>
+                <thead><tr style={{background:"#f8fafc"}}>{["학교명","시설명","담당","완수일","D-Day","진행","상태"].map(h=><th key={h} style={{padding:"9px 12px",textAlign:"left",color:"#64748b",fontWeight:600,fontSize:11,borderBottom:"2px solid #e2e8f0"}}>{h}</th>)}</tr></thead>
+                <tbody>{rows.map((r,i)=>{const d=diffDays(r.완수일);return(
+                  <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2?"#fafafa":"#fff"}}>
+                    <td style={{padding:"9px 12px",fontWeight:600}}>{r.학교명}</td>
+                    <td style={{padding:"9px 12px",color:"#64748b"}}>{r.시설명}</td>
+                    <td style={{padding:"9px 12px"}}>{r.lead?<div style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={18}/><span style={{fontSize:11}}>{r.lead}</span></div>:"-"}</td>
+                    <td style={{padding:"9px 12px",color:"#ea580c"}}>{r.완수일||"-"}</td>
+                    <td style={{padding:"9px 12px"}}><span style={{background:urgBg(d),color:urgC(d),borderRadius:20,padding:"2px 8px",fontWeight:700,fontSize:11}}>{dLabel(d)}</span></td>
+                    <td style={{padding:"9px 12px",minWidth:130}}><PBar step={r.progress||0} compact/></td>
+                    <td style={{padding:"9px 12px"}}><Bdg label={r.status||"예정"} bg={SS[r.status||"예정"]?.bg||"#f3f4f6"} c={SS[r.status||"예정"]?.c||"#6b7280"}/></td>
+                  </tr>
+                );})}
+                </tbody>
+              </table>
+            }
           </div>
         </>}
 
-        {tab==="일정 관리"   &&<CalendarView rows={rows} setRows={setRows} members={members}/>}
-        {tab==="현장 관리"   &&<SiteManager rows={rows} setRows={setRows} isAdmin={isAdmin} members={members}/>}
-        {tab==="팀 채팅"     &&<TeamChat user={user} members={members}/>}
-        {tab==="매출 현황"   &&isAdmin&&<RevenueView rows={rows} setRows={setRows}/>}
-        {tab==="팀원 관리"   &&isAdmin&&<MemberManager rows={rows} members={members}/>}
-        {tab==="설정"        &&isAdmin&&<SettingsPanel adminPw={adminPw} setAdminPw={setAdminPw} members={members} setMembers={setMembers}/>}
-
-        {tab==="긴급 보고서"&&(
-          <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"hidden"}}>
-            <div style={{padding:"16px 22px",borderBottom:"1px solid #f1f5f9",fontWeight:700,fontSize:15}}>🚨 보고서 완수일 긴급도</div>
-            {[...rows].filter(r=>r.progress<6).sort((a,b)=>diffDays(a.완수일)-diffDays(b.완수일)).map((r,i)=>{
-              const d=diffDays(r.완수일),ug=urgColor(d),rc=i===0?"#ef4444":i===1?"#f97316":i===2?"#eab308":"#94a3b8";
-              return<div key={r.id} style={{display:"flex",alignItems:"center",padding:"13px 20px",borderBottom:"1px solid #f1f5f9",gap:12,background:i===0?"#fff8f8":i===1?"#fff9f5":"#fff"}}>
-                <div style={{width:30,height:30,borderRadius:"50%",background:rc,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:13,flexShrink:0}}>{i+1}</div>
-                <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{r.학교명} <span style={{fontSize:11,color:"#64748b",fontWeight:400}}>· {r.시설명}</span></div><PBar step={r.progress||0} compact/></div>
-                <div style={{fontSize:11,color:"#64748b",flexShrink:0}}>완수: {r.완수일||"-"}</div>
-                {r.lead&&<div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}><Av name={r.lead} size={22}/><span style={{fontSize:11}}>{r.lead}</span></div>}
-                <div style={{background:ug.bg,color:ug.color,borderRadius:10,padding:"7px 14px",fontWeight:800,fontSize:18,minWidth:60,textAlign:"center",flexShrink:0}}>{dLabel(d)}</div>
-                {isAdmin&&<div style={{display:"flex",gap:4,flexShrink:0,flexWrap:"wrap"}}>
-                  {STEPS_SHORT.map((st,idx)=><button key={st} onClick={()=>updProg(r.id,idx+1)} style={{padding:"3px 8px",borderRadius:20,border:"1px solid",fontSize:10,cursor:"pointer",fontWeight:600,borderColor:r.progress===idx+1?"#1d4ed8":r.progress>idx+1?"#86efac":"#e5e7eb",background:r.progress===idx+1?"#1d4ed8":r.progress>idx+1?"#f0fdf4":"#fff",color:r.progress===idx+1?"#fff":r.progress>idx+1?"#16a34a":"#6b7280"}}>{r.progress>idx+1?"✓":""}{st}</button>)}
-                </div>}
-              </div>;
-            })}
-          </div>
-        )}
+        {tab==="일정 관리"    && <Calendar rows={rows}/>}
+        {tab==="긴급 보고서"  && <UrgentReport rows={rows} setRows={setRows} isAdmin={isAdmin}/>}
+        {tab==="현장 관리"    && <SiteManager rows={rows} setRows={setRows} members={members} isAdmin={isAdmin}/>}
+        {tab==="팀 채팅"      && <Chat user={user} members={members}/>}
+        {tab==="매출 현황"    && isAdmin && <Revenue rows={rows} setRows={setRows}/>}
+        {tab==="설정"         && isAdmin && <Settings adminPw={adminPw} setAdminPw={setAdminPw} members={members} setMembers={setMembers}/>}
       </div>
     </div>
   );
