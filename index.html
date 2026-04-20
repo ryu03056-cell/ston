@@ -10,7 +10,7 @@
 <script>
   // 서비스워커 수동 등록 (GitHub Pages 하위 경로 대응)
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/ston/OneSignalSDKWorker.js', {scope:'/ston/'})
+    navigator.serviceWorker.register('/OneSignalSDKWorker.js', {scope:'/'})
       .then(r=>console.log('✅ SW 등록 성공:', r.scope))
       .catch(e=>console.warn('SW 등록 실패:', e));
   }
@@ -1604,8 +1604,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
         appId: "26e9e8f3-42a8-4553-b8ef-0a84714db091",
         notifyButton: { enable: false },
         allowLocalhostAsSecureOrigin: true,
-        path: "/ston/",
-        serviceWorkerParam: { scope: "/ston/" },
+        
+        serviceWorkerParam: { scope: "/" },
       });
       console.log('✅ OneSignal 초기화 완료');
     });
