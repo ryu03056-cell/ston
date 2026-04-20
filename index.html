@@ -1264,6 +1264,98 @@ function Settings({adminPw,setAdminPw,members,setMembers}) {
 /* ══════════════════════════════════════
    메인 App — 비밀번호 로딩 버그 수정
 ══════════════════════════════════════ */
+function Overview({rows,total,done,urgCnt,delayed}) {
+  const [ovFilter, setOvFilter] = useState({status:"전체",lead:"전체",urgency:"전체"});
+  const leads=["전체",...[...new Set(rows.map(r=>r.lead).filter(Boolean))]];
+  const statuses=["전체",...STATUS_LIST];
+  const urgLabels=["전체","D-7 이내","D-14 이내","완수일 미정","완료"];
+  const filtered=rows.filter(r=>{
+    if(ovFilter.status!=="전체"&&(r.status||"예정")!==ovFilter.status)return false;
+    if(ovFilter.lead!=="전체"&&r.lead!==ovFilter.lead)return false;
+    if(ovFilter.urgency!=="전체"){
+      const d=diffDays(r.완수일);
+      if(ovFilter.urgency==="D-7 이내"&&!(d!==null&&d<=7&&r.progress<6))return false;
+      if(ovFilter.urgency==="D-14 이내"&&!(d!==null&&d<=14&&r.progress<6))return false;
+      if(ovFilter.urgency==="완수일 미정"&&r.완수일)return false;
+      if(ovFilter.urgency==="완료"&&r.progress!==6)return false;
+    }
+    return true;
+  });
+  const Chip=({label,active,onClick})=>(
+    <button onClick={onClick} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${active?"#1d4ed8":"#e5e7eb"}`,background:active?"#1d4ed8":"#fff",color:active?"#fff":"#475569",fontSize:12,fontWeight:active?700:500,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>
+      {label}
+    </button>
+  );
+  return <>
+    {/* 통계 카드 */}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
+      {[{l:"총 점검 건수",v:total,u:"건",c:"#1d4ed8"},{l:"완료",v:done,u:"건",c:"#16a34a"},{l:"D-7 이내 긴급",v:urgCnt,u:"건",c:"#f97316"},{l:"지연",v:delayed,u:"건",c:"#dc2626"}].map(k=>(
+        <div key={k.l} style={{background:"#fff",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderTop:`3px solid ${k.c}`}}>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>{k.l}</div>
+          <div style={{fontSize:26,fontWeight:800,color:k.c}}>{k.v}<span style={{fontSize:13,fontWeight:500,color:"#94a3b8"}}>{k.u}</span></div>
+        </div>
+      ))}
+    </div>
+
+    {/* 필터 */}
+    <div style={{background:"#fff",borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",marginBottom:16}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,fontWeight:700,color:"#374151",minWidth:36}}>상태</span>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {statuses.map(s=><Chip key={s} label={s} active={ovFilter.status===s} onClick={()=>setOvFilter(f=>({...f,status:s}))}/>)}
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,fontWeight:700,color:"#374151",minWidth:36}}>담당자</span>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {leads.map(l=><Chip key={l} label={l} active={ovFilter.lead===l} onClick={()=>setOvFilter(f=>({...f,lead:l}))}/>)}
+        </div>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,fontWeight:700,color:"#374151",minWidth:36}}>긴급도</span>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {urgLabels.map(u=><Chip key={u} label={u} active={ovFilter.urgency===u} onClick={()=>setOvFilter(f=>({...f,urgency:u}))}/>)}
+        </div>
+      </div>
+    </div>
+
+    {/* 결과 헤더 */}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+      <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{filtered.length}건</span>
+      {(ovFilter.status!=="전체"||ovFilter.lead!=="전체"||ovFilter.urgency!=="전체")&&
+        <button onClick={()=>setOvFilter({status:"전체",lead:"전체",urgency:"전체"})}
+          style={{fontSize:11,color:"#dc2626",background:"#fff1f2",border:"1px solid #fca5a5",borderRadius:8,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit"}}>필터 초기화</button>}
+    </div>
+
+    {/* 카드 목록 */}
+    {filtered.length===0
+      ?<div style={{background:"#fff",borderRadius:14,padding:40,textAlign:"center",color:"#94a3b8",boxShadow:"0 1px 4px rgba(0,0,0,.07)"}}>조건에 맞는 현장이 없어요</div>
+      :<div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {filtered.map((r)=>{
+          const d=diffDays(r.완수일);
+          return(
+            <div key={r.id} style={{background:"#fff",borderRadius:14,padding:"14px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderLeft:`4px solid ${urgC(d)||"#e5e7eb"}`,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:160}}>
+                <div style={{fontWeight:700,fontSize:13}}>{r.학교명} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>· {r.시설명}</span></div>
+                <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+                  <Bdg label={r.status||"예정"} bg={SS[r.status||"예정"]?.bg||"#f3f4f6"} c={SS[r.status||"예정"]?.c||"#6b7280"}/>
+                  {r.lead&&<div style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={16}/><span style={{fontSize:11,color:"#475569"}}>{r.lead}</span></div>}
+                </div>
+              </div>
+              <div style={{minWidth:130}}><PBar step={r.progress||0} compact/></div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>완수일</div>
+                <div style={{fontSize:12,color:"#ea580c",fontWeight:600,marginBottom:4}}>{r.완수일||"미정"}</div>
+                <span style={{background:urgBg(d),color:urgC(d),borderRadius:20,padding:"2px 10px",fontWeight:700,fontSize:12}}>{dLabel(d)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    }
+  </>;
+}
+
 function App() {
   const [user,    setUser]    = useState(null);
   const [tab,     setTab]     = useState("전체 현황");
@@ -1400,98 +1492,7 @@ function App() {
           </div>
         </div>
 
-        {tab==="전체 현황"&&(()=>{
-          // ── 전체 현황 필터 상태 ──
-          const [ovFilter, setOvFilter] = React.useState({status:"전체",lead:"전체",urgency:"전체"});
-          const leads=["전체",...[...new Set(rows.map(r=>r.lead).filter(Boolean))]];
-          const statuses=["전체",...STATUS_LIST];
-          const urgLabels=["전체","D-7 이내","D-14 이내","완수일 미정","완료"];
-          const filtered=rows.filter(r=>{
-            if(ovFilter.status!=="전체"&&(r.status||"예정")!==ovFilter.status)return false;
-            if(ovFilter.lead!=="전체"&&r.lead!==ovFilter.lead)return false;
-            if(ovFilter.urgency!=="전체"){
-              const d=diffDays(r.완수일);
-              if(ovFilter.urgency==="D-7 이내"&&!(d!==null&&d<=7&&r.progress<6))return false;
-              if(ovFilter.urgency==="D-14 이내"&&!(d!==null&&d<=14&&r.progress<6))return false;
-              if(ovFilter.urgency==="완수일 미정"&&r.완수일)return false;
-              if(ovFilter.urgency==="완료"&&r.progress!==6)return false;
-            }
-            return true;
-          });
-          const Chip=({label,active,onClick})=>(
-            <button onClick={onClick} style={{padding:"5px 12px",borderRadius:20,border:`1px solid ${active?"#1d4ed8":"#e5e7eb"}`,background:active?"#1d4ed8":"#fff",color:active?"#fff":"#475569",fontSize:12,fontWeight:active?700:500,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit"}}>
-              {label}
-            </button>
-          );
-          return <>
-            {/* 통계 카드 */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
-              {[{l:"총 점검 건수",v:total,u:"건",c:"#1d4ed8"},{l:"완료",v:done,u:"건",c:"#16a34a"},{l:"D-7 이내 긴급",v:urgCnt,u:"건",c:"#f97316"},{l:"지연",v:delayed,u:"건",c:"#dc2626"}].map(k=>(
-                <div key={k.l} style={{background:"#fff",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderTop:`3px solid ${k.c}`}}>
-                  <div style={{fontSize:11,color:"#64748b",marginBottom:5}}>{k.l}</div>
-                  <div style={{fontSize:26,fontWeight:800,color:k.c}}>{k.v}<span style={{fontSize:13,fontWeight:500,color:"#94a3b8"}}>{k.u}</span></div>
-                </div>
-              ))}
-            </div>
-
-            {/* 필터 */}
-            <div style={{background:"#fff",borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",marginBottom:16}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-                <span style={{fontSize:12,fontWeight:700,color:"#374151",minWidth:36}}>상태</span>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {statuses.map(s=><Chip key={s} label={s} active={ovFilter.status===s} onClick={()=>setOvFilter(f=>({...f,status:s}))}/>)}
-                </div>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,flexWrap:"wrap"}}>
-                <span style={{fontSize:12,fontWeight:700,color:"#374151",minWidth:36}}>담당자</span>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {leads.map(l=><Chip key={l} label={l} active={ovFilter.lead===l} onClick={()=>setOvFilter(f=>({...f,lead:l}))}/>)}
-                </div>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                <span style={{fontSize:12,fontWeight:700,color:"#374151",minWidth:36}}>긴급도</span>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {urgLabels.map(u=><Chip key={u} label={u} active={ovFilter.urgency===u} onClick={()=>setOvFilter(f=>({...f,urgency:u}))}/>)}
-                </div>
-              </div>
-            </div>
-
-            {/* 결과 헤더 */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-              <span style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{filtered.length}건</span>
-              {(ovFilter.status!=="전체"||ovFilter.lead!=="전체"||ovFilter.urgency!=="전체")&&
-                <button onClick={()=>setOvFilter({status:"전체",lead:"전체",urgency:"전체"})}
-                  style={{fontSize:11,color:"#dc2626",background:"#fff1f2",border:"1px solid #fca5a5",borderRadius:8,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit"}}>필터 초기화</button>}
-            </div>
-
-            {/* 카드 목록 */}
-            {filtered.length===0
-              ?<div style={{background:"#fff",borderRadius:14,padding:40,textAlign:"center",color:"#94a3b8",boxShadow:"0 1px 4px rgba(0,0,0,.07)"}}>조건에 맞는 현장이 없어요</div>
-              :<div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {filtered.map((r,i)=>{
-                  const d=diffDays(r.완수일);
-                  return(
-                    <div key={r.id} style={{background:"#fff",borderRadius:14,padding:"14px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",borderLeft:`4px solid ${urgC(d)||"#e5e7eb"}`,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                      <div style={{flex:1,minWidth:160}}>
-                        <div style={{fontWeight:700,fontSize:13}}>{r.학교명} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>· {r.시설명}</span></div>
-                        <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
-                          <Bdg label={r.status||"예정"} bg={SS[r.status||"예정"]?.bg||"#f3f4f6"} c={SS[r.status||"예정"]?.c||"#6b7280"}/>
-                          {r.lead&&<div style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={16}/><span style={{fontSize:11,color:"#475569"}}>{r.lead}</span></div>}
-                        </div>
-                      </div>
-                      <div style={{minWidth:130}}><PBar step={r.progress||0} compact/></div>
-                      <div style={{textAlign:"right",flexShrink:0}}>
-                        <div style={{fontSize:10,color:"#94a3b8",marginBottom:2}}>완수일</div>
-                        <div style={{fontSize:12,color:"#ea580c",fontWeight:600,marginBottom:4}}>{r.완수일||"미정"}</div>
-                        <span style={{background:urgBg(d),color:urgC(d),borderRadius:20,padding:"2px 10px",fontWeight:700,fontSize:12}}>{dLabel(d)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            }
-          </>;
-        })()}
+        {tab==="전체 현황" && <Overview rows={rows} total={total} done={done} urgCnt={urgCnt} delayed={delayed}/>}
 
         {tab==="일정 관리"   && <Calendar rows={rows}/>}
         {tab==="긴급 보고서" && <UrgentReport rows={rows} setRows={setRows}/>}
