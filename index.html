@@ -985,31 +985,47 @@ function Chat({user,members}) {
     return()=>window.removeEventListener("resize",h);
   },[]);
 
-  // 알림 권한 요청 + OneSignal 구독 (강제)
+  // 페이지 로드 후 구독 상태 확인
+  useEffect(()=>{
+    const check=()=>{
+      if(window.OneSignal){
+        const opted=window.OneSignal.User?.PushSubscription?.optedIn;
+        setSubscribed(!!opted);
+      }
+    };
+    check();
+    const t=setTimeout(check,3000);
+    return()=>clearTimeout(t);
+  },[]);
+
+  // 알림 권한 요청 + OneSignal 구독
   const reqNotif=()=>{
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async(OS)=>{
-      try{
-        // 브라우저 알림 권한 요청
-        await OS.Notifications.requestPermission();
-        // 구독 opt-in
+    // 이미 로드된 window.OneSignal 직접 사용
+    const trySubscribe = async () => {
+      try {
+        const OS = window.OneSignal;
+        if(!OS){ alert("OneSignal이 아직 로드 중이에요. 잠시 후 다시 눌러주세요."); return; }
+        // 권한이 없으면 요청, 있으면 바로 optIn
+        if(Notification.permission === 'default'){
+          const perm = await Notification.requestPermission();
+          if(perm !== 'granted'){ alert("알림 허용이 필요해요."); return; }
+        }
+        setNotifPerm(Notification.permission);
+        // OneSignal 구독
         await OS.User.PushSubscription.optIn();
         const opted = OS.User.PushSubscription.optedIn;
         setSubscribed(!!opted);
         if(opted){
-          setNotifPerm("granted");
-          alert("✅ 알림이 설정됐어요! 이제 채팅 메시지 알림이 옵니다.");
+          alert("✅ 알림이 설정됐어요!");
+        } else {
+          alert("구독이 안 됐어요. 브라우저 알림 설정을 확인해주세요.");
         }
-      }catch(e){
-        // fallback
-        if(typeof Notification!=="undefined"){
-          Notification.requestPermission().then(p=>{
-            setNotifPerm(p);
-            if(p==="granted") setSubscribed(true);
-          });
-        }
+      } catch(e) {
+        console.error('알림 설정 실패:', e);
+        alert("오류: " + e.message);
       }
-    });
+    };
+    trySubscribe();
   };
 
   // 현재 방 메시지 구독
