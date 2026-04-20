@@ -12,7 +12,7 @@
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
     await OneSignal.init({
-      appId: "26e9e8f3-42a8-4553-b8ef-0a84714db091",   // ← OneSignal App ID 넣기
+      appId: "26e9e8f3-42a8-4553-b8ef-0a84714db091",
       notifyButton: { enable: false },
       allowLocalhostAsSecureOrigin: true,
     });
@@ -973,6 +973,7 @@ function Chat({user,members}) {
   const [room,setRoom]=useState("전체");
   const [uploading,setUploading]=useState(false);
   const [unread,setUnread]=useState({}); // {방이름: count}
+  const [subscribed, setSubscribed]=useState(false);
   const [notifPerm,setNotifPerm]=useState(typeof Notification!=="undefined"?Notification.permission:"denied");
   const [isMobile,setIsMobile]=useState(typeof window!=="undefined"&&window.innerWidth<768);
   const imgRef=useRef();
@@ -987,15 +988,38 @@ function Chat({user,members}) {
     return()=>window.removeEventListener("resize",h);
   },[]);
 
-  // 알림 권한 요청 (OneSignal)
-  const reqNotif=()=>{
-    if(window.OneSignal){
-      window.OneSignal.push(()=>{
-        window.OneSignal.showNativePrompt();
+  // OneSignal 구독 상태 확인
+  useEffect(()=>{
+    const check=()=>{
+      window.OneSignalDeferred=window.OneSignalDeferred||[];
+      window.OneSignalDeferred.push(async(OS)=>{
+        try{
+          const opted=await OS.User.PushSubscription.optedIn;
+          setSubscribed(!!opted);
+        }catch(e){}
       });
-    } else if(typeof Notification!=="undefined"){
-      Notification.requestPermission().then(p=>setNotifPerm(p));
-    }
+    };
+    check();
+    const t=setTimeout(check,3000); // SDK 로드 후 재확인
+    return()=>clearTimeout(t);
+  },[]);
+
+  // 알림 권한 요청 (OneSignal v16)
+  const reqNotif=()=>{
+    window.OneSignalDeferred=window.OneSignalDeferred||[];
+    window.OneSignalDeferred.push(async(OS)=>{
+      try{
+        await OS.Notifications.requestPermission();
+        const opted=await OS.User.PushSubscription.optedIn;
+        setSubscribed(!!opted);
+        if(opted) setNotifPerm("granted");
+      }catch(e){
+        // fallback: 기본 브라우저 알림
+        if(typeof Notification!=="undefined"){
+          Notification.requestPermission().then(p=>setNotifPerm(p));
+        }
+      }
+    });
   };
 
   // 현재 방 메시지 구독
@@ -1039,8 +1063,8 @@ function Chat({user,members}) {
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
 
   // OneSignal 푸시 알림 전송 (REST API)
-  const OS_APP_ID   = "26e9e8f3-42a8-4553-b8ef-0a84714db091";       // ← OneSignal App ID
-  const OS_API_KEY  = "dynhfzf6ruawneihwy3ifrtif"; // ← OneSignal REST API Key
+  const OS_APP_ID   = "26e9e8f3-42a8-4553-b8ef-0a84714db091";
+  const OS_API_KEY  = "dynhfzf6ruawneihwy3ifrtif";
 
   const pushNotif = (title, body) => {
     fetch("https://onesignal.com/api/v1/notifications", {
@@ -1101,7 +1125,9 @@ function Chat({user,members}) {
         ))}
         {/* 알림 버튼 */}
         <div style={{marginTop:"auto",padding:"10px 4px",borderTop:"1px solid #f1f5f9"}}>
-          {notifPerm!=="granted"&&<button onClick={reqNotif} style={{width:"100%",padding:"6px",borderRadius:8,border:"1px solid #e5e7eb",background:"#f8fafc",fontSize:11,cursor:"pointer",color:"#475569",marginBottom:8,fontFamily:"inherit"}}>🔔 알림 켜기</button>}
+          {subscribed
+            ?<div style={{width:"100%",padding:"6px",borderRadius:8,background:"#f0fdf4",fontSize:11,color:"#16a34a",marginBottom:8,textAlign:"center",border:"1px solid #86efac"}}>✅ 알림 켜짐</div>
+            :<button onClick={reqNotif} style={{width:"100%",padding:"6px",borderRadius:8,border:"1px solid #e5e7eb",background:"#f8fafc",fontSize:11,cursor:"pointer",color:"#475569",marginBottom:8,fontFamily:"inherit"}}>🔔 알림 켜기</button>}
           <div style={{display:"flex",alignItems:"center",gap:7}}>
             <div style={{width:26,height:26,borderRadius:"50%",background:MC[user.name]||"#1d4ed8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:12}}>{user.name[0]}</div>
             <div><div style={{fontSize:11,fontWeight:700}}>{user.name}</div><div style={{fontSize:9,color:user.role==="admin"?"#f97316":"#22c55e"}}>● {user.role==="admin"?"관리자":"팀원"}</div></div>
@@ -1118,7 +1144,9 @@ function Chat({user,members}) {
               {unread[r]>0&&<span style={{background:"#ef4444",color:"#fff",fontSize:10,fontWeight:700,minWidth:16,height:16,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px",marginLeft:2}}>{unread[r]}</span>}
             </button>
           ))}
-          {notifPerm!=="granted"&&<button onClick={reqNotif} style={{padding:"6px 10px",borderRadius:20,border:"1px solid #e5e7eb",background:"#fff",fontSize:12,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"inherit",color:"#475569"}}>🔔</button>}
+          {subscribed
+            ?<span style={{padding:"6px 10px",borderRadius:20,border:"1px solid #86efac",background:"#f0fdf4",fontSize:12,whiteSpace:"nowrap",flexShrink:0,color:"#16a34a"}}>✅</span>
+            :<button onClick={reqNotif} style={{padding:"6px 10px",borderRadius:20,border:"1px solid #e5e7eb",background:"#fff",fontSize:12,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,fontFamily:"inherit",color:"#475569"}}>🔔</button>}
         </div>}
 
         <div style={{padding:"12px 18px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",gap:8,background:`${rColors[room]}08`}}>
