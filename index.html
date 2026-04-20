@@ -15,6 +15,7 @@
       appId: "26e9e8f3-42a8-4553-b8ef-0a84714db091",
       notifyButton: { enable: false },
       allowLocalhostAsSecureOrigin: true,
+      path: "/ston/",
       serviceWorkerParam: { scope: "/ston/" },
     });
   });
@@ -1068,20 +1069,28 @@ function Chat({user,members}) {
   const OS_API_KEY  = "os_v2_app_e3u6r42cvbcvhohpbkchctnqshqaccue7m3u3ov3optghtublkcz55mpgfkmorzhk4rfmcg2ch3qquydcgea4dlmksix3hgufcd7hyy";
 
   const pushNotif = (title, body) => {
-    fetch("https://onesignal.com/api/v1/notifications", {
-      method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization":`Key ${OS_API_KEY}` },
-      body: JSON.stringify({
-        app_id: OS_APP_ID,
-        included_segments: ["All"],
-        headings: { ko: title, en: title },
-        contents: { ko: body,  en: body  },
-        url: window.location.href,
-      })
-    })
-    .then(r=>r.json())
-    .then(d=>{ if(d.errors) console.warn("OneSignal 오류:", JSON.stringify(d.errors)); else console.log("✅ 알림 전송:", d.id); })
-    .catch(e=>console.warn("알림 전송 실패:", e));
+    // XMLHttpRequest 사용 (fetch보다 CORS 우회에 강함)
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "https://onesignal.com/api/v1/notifications", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("Authorization", `Key ${OS_API_KEY}`);
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState === 4) {
+        try {
+          const d = JSON.parse(xhr.responseText);
+          if (d.errors) console.warn("OneSignal 오류:", JSON.stringify(d.errors));
+          else if (d.id) console.log("✅ 알림 전송 성공:", d.id, "수신자:", d.recipients);
+          else console.log("OneSignal 응답:", JSON.stringify(d));
+        } catch(e) {}
+      }
+    };
+    xhr.send(JSON.stringify({
+      app_id: OS_APP_ID,
+      included_segments: ["All"],
+      headings: { ko: title, en: title },
+      contents: { ko: body, en: body },
+      url: window.location.href,
+    }));
   };
 
   const send=()=>{
