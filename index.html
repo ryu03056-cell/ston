@@ -843,6 +843,12 @@ function UrgentReport({rows,setRows}) {
     setRows(u);fbRows(u);
   };
 
+  // 학교 전체 납품일 일괄 업데이트
+  const updSchoolDelivery=(schoolName,value)=>{
+    const u=rows.map(r=>r.학교명===schoolName?{...r,납품일:value}:r);
+    setRows(u);fbRows(u);
+  };
+
   // 현재 탭에 맞춰 학교별 그룹핑
   const listRows=showDone?completed:inProgress;
   const grouped=(()=>{
@@ -924,6 +930,17 @@ function UrgentReport({rows,setRows}) {
                   </div>
                 </div>
                 {!showDone&&<div style={{background:urgBg(g.minD),color:urgC(g.minD),borderRadius:10,padding:"8px 14px",fontWeight:800,fontSize:18,minWidth:70,textAlign:"center",flexShrink:0}}>{dLabel(g.minD)}</div>}
+                {showDone&&(()=>{
+                  // 학교의 대표 납품일 (첫 번째 행의 납품일 사용, 일괄 적용되므로 모두 동일)
+                  const schoolDelivery=g.rows[0]?.납품일||"";
+                  return(
+                    <div onClick={e=>e.stopPropagation()} style={{display:"flex",flexDirection:"column",gap:3,alignItems:"flex-start",flexShrink:0}}>
+                      <label style={{fontSize:10,color:"#7c3aed",fontWeight:700}}>📦 납품일 (학교 일괄)</label>
+                      <input type="date" value={schoolDelivery} onChange={e=>updSchoolDelivery(g.학교명,e.target.value)}
+                        style={{padding:"6px 10px",border:`1px solid ${schoolDelivery?"#a78bfa":"#e5e7eb"}`,borderRadius:8,fontSize:13,background:schoolDelivery?"#f5f3ff":"#fff",color:schoolDelivery?"#7c3aed":"#475569",fontWeight:700,fontFamily:"inherit",outline:"none"}}/>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* 펼쳐졌을 때: 하위 동 목록 */}
@@ -938,12 +955,6 @@ function UrgentReport({rows,setRows}) {
                             {r.lead&&<span style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={16}/>{r.lead}</span>}
                             <span>완수 {r.완수일||"-"}</span>
                           </div>
-                        </div>
-                        {/* 납품일 input */}
-                        <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                          <label style={{fontSize:10,color:"#7c3aed",fontWeight:600}}>📦 납품일</label>
-                          <input type="date" value={r.납품일||""} onChange={e=>updField(r.id,"납품일",e.target.value)}
-                            style={{padding:"5px 8px",border:`1px solid ${r.납품일?"#a78bfa":"#e5e7eb"}`,borderRadius:6,fontSize:12,background:r.납품일?"#f5f3ff":"#fff",color:r.납품일?"#7c3aed":"#475569",fontWeight:600}}/>
                         </div>
                         <button onClick={()=>updProg(r.id,5)}
                           style={{padding:"7px 14px",borderRadius:10,border:"1px solid #f97316",background:"#fff7ed",color:"#c2410c",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
@@ -1080,7 +1091,7 @@ function Calendar({rows}) {
                   {(ev.s.length>0||ev.r.length>0||ev.d.length>0)&&<div style={{display:"flex",gap:3,flexWrap:"wrap",justifyContent:"center"}}>
                     {ev.s.length>0&&<span style={{background:"#3b82f6",color:"#fff",fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:10,lineHeight:1.4,minWidth:18,textAlign:"center"}}>{ev.s.length}</span>}
                     {ev.r.length>0&&<span style={{background:"#f97316",color:"#fff",fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:10,lineHeight:1.4,minWidth:18,textAlign:"center"}}>{ev.r.length}</span>}
-                    {ev.d.length>0&&<span style={{background:"#7c3aed",color:"#fff",fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:10,lineHeight:1.4,minWidth:18,textAlign:"center"}}>{ev.d.length}</span>}
+                    {ev.d.length>0&&<span style={{background:"#7c3aed",color:"#fff",fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:10,lineHeight:1.4,minWidth:18,textAlign:"center"}}>{new Set(ev.d.map(r=>r.학교명)).size}</span>}
                   </div>}
                   {hasNote&&<div style={{fontSize:9,color:"#7c3aed",textAlign:"center",lineHeight:1}}>📝</div>}
                 </>}
@@ -1095,7 +1106,7 @@ function Calendar({rows}) {
           {sel&&(sev.s.length>0||sev.r.length>0||sev.d.length>0)&&<>
             {sev.s.length>0&&<span style={{background:"#dbeafe",color:"#1d4ed8",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10}}>🔵 현장조사 {sev.s.length}</span>}
             {sev.r.length>0&&<span style={{background:"#ffedd5",color:"#c2410c",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10}}>🟠 완수일 {sev.r.length}</span>}
-            {sev.d.length>0&&<span style={{background:"#ede9fe",color:"#7c3aed",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10}}>🟣 납품일 {sev.d.length}</span>}
+            {sev.d.length>0&&<span style={{background:"#ede9fe",color:"#7c3aed",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10}}>🟣 납품일 {new Set(sev.d.map(r=>r.학교명)).size}개교</span>}
           </>}
         </div>
         {!sel&&<div style={{color:"#94a3b8",fontSize:12,textAlign:"center",marginTop:40}}>{isMobile?"↑ 위에서 날짜를 선택하면":"날짜를 선택하면"}<br/>일정이 표시됩니다</div>}
@@ -1121,14 +1132,23 @@ function Calendar({rows}) {
             </div>
           );
         })}
-        {sev.d.map(r=>(
-          <div key={"d_"+r.id} style={{background:"#f5f3ff",borderRadius:8,padding:"12px",marginBottom:8,borderLeft:"3px solid #7c3aed"}}>
-            <div style={{fontSize:11,color:"#7c3aed",fontWeight:700,marginBottom:4}}>🟣 납품일</div>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{r.학교명}</div>
-            <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{r.시설명} · {r.납품방법==="현장납품"?"🏫 현장납품":"📦 택배납품"}</div>
-            {r.lead&&<div style={{display:"flex",alignItems:"center",gap:5,marginTop:6}}><Av name={r.lead} size={18}/><span style={{fontSize:11,fontWeight:600}}>{r.lead}</span></div>}
-          </div>
-        ))}
+        {(()=>{
+          // 같은 학교는 하나로 합치기 (학교 단위 납품)
+          const bySchool={};
+          sev.d.forEach(r=>{
+            const k=r.학교명||"(이름없음)";
+            if(!bySchool[k])bySchool[k]={학교명:k,지역:r.지역||"",납품방법:r.납품방법,rows:[]};
+            bySchool[k].rows.push(r);
+          });
+          return Object.values(bySchool).map(g=>(
+            <div key={"d_"+g.학교명} style={{background:"#f5f3ff",borderRadius:8,padding:"12px",marginBottom:8,borderLeft:"3px solid #7c3aed"}}>
+              <div style={{fontSize:11,color:"#7c3aed",fontWeight:700,marginBottom:4}}>🟣 납품일 (학교 일괄)</div>
+              <div style={{fontWeight:600,fontSize:13,marginBottom:4}}>{g.학교명}</div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{g.지역}</div>
+              <div style={{fontSize:11,color:"#64748b"}}>🏢 {g.rows.length}개 동 · {g.납품방법==="현장납품"?"🏫 현장납품":"📦 택배납품"}</div>
+            </div>
+          ));
+        })()}
 
         {/* 메모 입력 */}
         {sel&&<div style={{marginTop:12,borderTop:"1px solid #f1f5f9",paddingTop:14}}>
