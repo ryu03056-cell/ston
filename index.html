@@ -12,14 +12,6 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
-<script>
-  // 서비스워커 수동 등록 (GitHub Pages 하위 경로 대응)
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/OneSignalSDKWorker.js', {scope:'/'})
-      .then(r=>console.log('✅ SW 등록 성공:', r.scope))
-      .catch(e=>console.warn('SW 등록 실패:', e));
-  }
-</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -990,47 +982,45 @@ function Chat({user,members}) {
     return()=>window.removeEventListener("resize",h);
   },[]);
 
-  // 페이지 로드 후 구독 상태 확인
+  // 페이지 로드 시 알림 권한 상태 확인
   useEffect(()=>{
-    const check=()=>{
-      if(window.OneSignal){
-        const opted=window.OneSignal.User?.PushSubscription?.optedIn;
-        setSubscribed(!!opted);
-      }
-    };
-    check();
-    const t=setTimeout(check,3000);
-    return()=>clearTimeout(t);
+    if(typeof Notification!=="undefined"){
+      setNotifPerm(Notification.permission);
+      setSubscribed(Notification.permission==="granted");
+    }
   },[]);
 
-  // 알림 권한 요청 + OneSignal 구독
+  // 알림 권한 요청
   const reqNotif=()=>{
-    // 이미 로드된 window.OneSignal 직접 사용
-    const trySubscribe = async () => {
-      try {
-        const OS = window.OneSignal;
-        if(!OS){ alert("OneSignal이 아직 로드 중이에요. 잠시 후 다시 눌러주세요."); return; }
-        // 권한이 없으면 요청, 있으면 바로 optIn
-        if(Notification.permission === 'default'){
-          const perm = await Notification.requestPermission();
-          if(perm !== 'granted'){ alert("알림 허용이 필요해요."); return; }
-        }
-        setNotifPerm(Notification.permission);
-        // OneSignal 구독
-        await OS.User.PushSubscription.optIn();
-        const opted = OS.User.PushSubscription.optedIn;
-        setSubscribed(!!opted);
-        if(opted){
-          alert("✅ 알림이 설정됐어요!");
-        } else {
-          alert("구독이 안 됐어요. 브라우저 알림 설정을 확인해주세요.");
-        }
-      } catch(e) {
-        console.error('알림 설정 실패:', e);
-        alert("오류: " + e.message);
+    if(typeof Notification==="undefined"){
+      alert("이 브라우저는 알림을 지원하지 않아요.");
+      return;
+    }
+    if(Notification.permission==="granted"){
+      // 이미 허용됨 - 테스트 알림
+      try{
+        new Notification("✅ 알림 테스트",{body:"알림이 잘 작동해요!",icon:"https://em-content.zobj.net/source/apple/391/school_1f3eb.png"});
+        alert("✅ 알림이 이미 켜져 있어요.\n사이트를 열어둔 상태에서 다른 사람이 메시지를 보내면 알림이 떠요.");
+      }catch(e){alert("알림 표시 실패: "+e.message);}
+      setSubscribed(true);
+      return;
+    }
+    if(Notification.permission==="denied"){
+      alert("❌ 알림이 차단돼 있어요.\n브라우저 주소창 왼쪽 🔒 아이콘 → 알림 → 허용으로 변경해주세요.");
+      return;
+    }
+    // default 상태 - 권한 요청
+    Notification.requestPermission().then(p=>{
+      setNotifPerm(p);
+      if(p==="granted"){
+        setSubscribed(true);
+        try{
+          new Notification("🔔 알림이 켜졌어요",{body:"이제 새 메시지가 오면 알려드릴게요.",icon:"https://em-content.zobj.net/source/apple/391/school_1f3eb.png"});
+        }catch(e){}
+      } else {
+        alert("알림이 허용되지 않았어요.");
       }
-    };
-    trySubscribe();
+    });
   };
 
   // 현재 방 메시지 구독
@@ -1047,9 +1037,11 @@ function Chat({user,members}) {
     return()=>ref.off();
   },[room]);
 
-  // 모든 방 미읽음 수 추적
+  // 모든 방 미읽음 수 + 브라우저 알림
   useEffect(()=>{
     const listeners={};
+    // 첫 로드 시점 기록 - 이전 메시지는 알림 안 띄움
+    const loadTime = Date.now();
     rooms.forEach(r=>{
       listeners[r]=db.ref(`chat/${r}`);
       listeners[r].on("value",snap=>{
@@ -1057,44 +1049,42 @@ function Chat({user,members}) {
         if(!d)return;
         const list=Object.values(d).sort((a,b)=>a.id-b.id);
         const lastSeen=lastSeenRef.current[r]||0;
-        const newMsgs=list.filter(m=>m.id>lastSeen&&m.sender!==user.name);
+        const newMsgs=list.filter(m=>m.id>lastSeen&&m.sender!==user.name&&m.id>loadTime);
+        // 다른 방이면 미읽음 카운트
         if(r!==room){
-          setUnread(u=>({...u,[r]:newMsgs.length}));
-          // 브라우저 알림
-          if(newMsgs.length>0&&notifPerm==="granted"&&document.hidden){
-            const last=newMsgs[newMsgs.length-1];
-            new Notification(`[${r}] ${last.sender}`,{body:last.imgUrl?"📷 사진":last.text,icon:"https://em-content.zobj.net/source/apple/391/school_1f3eb.png"});
-          }
+          setUnread(u=>({...u,[r]:(u[r]||0)+newMsgs.length}));
         }
+        // 브라우저 알림: 새 메시지 + 권한 허용 + (다른 방이거나 탭이 숨겨짐)
+        if(newMsgs.length>0 && notifPerm==="granted" && (r!==room || document.hidden)){
+          const last=newMsgs[newMsgs.length-1];
+          try{
+            const n=new Notification(`[${r}] ${last.sender}`,{
+              body:last.imgUrl?"📷 사진을 보냈어요":last.text,
+              icon:"https://em-content.zobj.net/source/apple/391/school_1f3eb.png",
+              tag:r, // 같은 방은 하나로 묶기
+              renotify:true
+            });
+            // 알림 클릭 시 해당 방으로
+            n.onclick=()=>{window.focus();setRoom(r);n.close();};
+          }catch(e){console.warn("알림 실패:",e);}
+        }
+        // 현재 방의 메시지라면 즉시 읽음 처리
+        if(r===room && list.length>0) lastSeenRef.current[r]=list[list.length-1].id;
       });
     });
     return()=>rooms.forEach(r=>listeners[r].off());
-  },[notifPerm]);
+  },[notifPerm,room]);
 
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
 
-  // OneSignal 푸시 알림 전송 (REST API)
-  const VERCEL_NOTIFY_URL = "https://ryu03056-cell-github-io.vercel.app/api/notify";
-
-  const pushNotif = (title, body) => {
-    fetch(VERCEL_NOTIFY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body, url: window.location.origin })
-    })
-    .then(r => r.json())
-    .then(d => {
-      if (d.id) console.log('✅ 알림 전송:', d.id, '수신자:', d.recipients);
-      else console.warn('알림 오류:', JSON.stringify(d));
-    })
-    .catch(e => console.warn('알림 실패:', e));
-  };
+  // 알림은 브라우저 Notification API로 처리 (메시지 수신 시 자동 트리거)
+  // 메시지 전송 시에는 별도 API 호출 없음 — Firebase가 모든 기기에 실시간 전달하면
+  // 수신 측에서 브라우저 알림을 띄움
 
   const send=()=>{
     if(!input.trim())return;
     const msg={id:Date.now(),sender:user.name,text:input.trim(),room,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric"})};
     db.ref(`chat/${room}/${msg.id}`).set(msg);
-    pushNotif(`[${room}] ${user.name}`, input.trim());
     setInput("");
   };
 
@@ -1109,7 +1099,6 @@ function Chat({user,members}) {
       const url=await ref.getDownloadURL();
       const msg={id:Date.now(),sender:user.name,imgUrl:url,text:"",room,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric"})};
       db.ref(`chat/${room}/${msg.id}`).set(msg);
-      pushNotif(`[${room}] ${user.name}`, "📷 사진을 보냈어요");
     }catch(err){alert("업로드 실패: "+err.message);}
     setUploading(false);
     e.target.value="";
@@ -1136,7 +1125,7 @@ function Chat({user,members}) {
         {/* 알림 버튼 */}
         <div style={{marginTop:"auto",padding:"10px 4px",borderTop:"1px solid #f1f5f9"}}>
           {subscribed
-            ?<button onClick={reqNotif} style={{width:"100%",padding:"6px",borderRadius:8,border:"1px solid #86efac",background:"#f0fdf4",fontSize:11,cursor:"pointer",color:"#16a34a",marginBottom:8,fontFamily:"inherit"}}>✅ 알림 켜짐 (재설정)</button>
+            ?<button onClick={reqNotif} style={{width:"100%",padding:"6px",borderRadius:8,border:"1px solid #86efac",background:"#f0fdf4",fontSize:11,cursor:"pointer",color:"#16a34a",marginBottom:8,fontFamily:"inherit"}}>✅ 알림 켜짐 (테스트)</button>
             :<button onClick={reqNotif} style={{width:"100%",padding:"6px",borderRadius:8,border:"1px solid #e5e7eb",background:"#f8fafc",fontSize:11,cursor:"pointer",color:"#475569",marginBottom:8,fontFamily:"inherit"}}>🔔 알림 켜기</button>}
           <div style={{display:"flex",alignItems:"center",gap:7}}>
             <div style={{width:26,height:26,borderRadius:"50%",background:MC[user.name]||"#1d4ed8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:12}}>{user.name[0]}</div>
@@ -1585,23 +1574,6 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-</script>
-
-<!-- OneSignal: React 렌더링 완료 후 로드 -->
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" async></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  window.addEventListener('load', function() {
-    OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "26e9e8f3-42a8-4553-b8ef-0a84714db091",
-        notifyButton: { enable: false },
-        allowLocalhostAsSecureOrigin: true,
-        serviceWorkerParam: { scope: "/" },
-      });
-      console.log('✅ OneSignal 초기화 완료');
-    });
-  });
 </script>
 </body>
 </html>
