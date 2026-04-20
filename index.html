@@ -1065,12 +1065,12 @@ function Chat({user,members}) {
 
   // OneSignal 푸시 알림 전송 (REST API)
   const OS_APP_ID   = "26e9e8f3-42a8-4553-b8ef-0a84714db091";
-  const OS_API_KEY  = "dynhfzf6ruawneihwy3ifrtif";
+  const OS_API_KEY  = "os_v2_app_e3u6r42cvbcvhohpbkchctnqshqaccue7m3u3ov3optghtublkcz55mpgfkmorzhk4rfmcg2ch3qquydcgea4dlmksix3hgufcd7hyy";
 
   const pushNotif = (title, body) => {
     fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
-      headers: { "Content-Type":"application/json", "Authorization":`Basic ${OS_API_KEY}` },
+      headers: { "Content-Type":"application/json", "Authorization":`Key ${OS_API_KEY}` },
       body: JSON.stringify({
         app_id: OS_APP_ID,
         included_segments: ["All"],
