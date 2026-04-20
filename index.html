@@ -7,6 +7,17 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "26e9e8f3-42a8-4553-b8ef-0a84714db091",   // ← OneSignal App ID 넣기
+      notifyButton: { enable: false },
+      allowLocalhostAsSecureOrigin: true,
+    });
+  });
+</script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -287,7 +298,7 @@ function SiteManager({rows,setRows,members,isAdmin}) {
           납품방법:r["납품방법"]||"현장납품",
           lead:r["담당자"]||members[0]||"",
           progress:0,
-          status:r["상태"]||"예정",
+          status:r["상태"]||(parseInt(r["진행단계"]||0)===6?"완료":parseInt(r["진행단계"]||0)>0?"진행중":"예정"),
           계약금액:parseInt(r["계약금액"])||0,
           현장참여:[]
         })).filter(r=>r.학교명);
@@ -718,7 +729,11 @@ function UrgentReport({rows,setRows}) {
   const sorted=showDone?completed:inProgress;
   const firstPending=inProgress.findIndex(r=>!r.완수일);
   const pendingCount=inProgress.filter(r=>!r.완수일).length;
-  const updProg=(id,step)=>{const u=rows.map(r=>r.id===id?{...r,progress:step}:r);setRows(u);fbRows(u);};
+  const updProg=(id,step)=>{
+    const autoStatus=step===0?"예정":step===6?"완료":"진행중";
+    const u=rows.map(r=>r.id===id?{...r,progress:step,status:autoStatus}:r);
+    setRows(u);fbRows(u);
+  };
   return(
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div style={{background:"#eff6ff",borderRadius:12,padding:"12px 16px",border:"1px solid #bfdbfe",fontSize:13,color:"#1d4ed8"}}>
@@ -972,10 +987,15 @@ function Chat({user,members}) {
     return()=>window.removeEventListener("resize",h);
   },[]);
 
-  // 알림 권한 요청
+  // 알림 권한 요청 (OneSignal)
   const reqNotif=()=>{
-    if(typeof Notification==="undefined")return;
-    Notification.requestPermission().then(p=>setNotifPerm(p));
+    if(window.OneSignal){
+      window.OneSignal.push(()=>{
+        window.OneSignal.showNativePrompt();
+      });
+    } else if(typeof Notification!=="undefined"){
+      Notification.requestPermission().then(p=>setNotifPerm(p));
+    }
   };
 
   // 현재 방 메시지 구독
@@ -1018,10 +1038,30 @@ function Chat({user,members}) {
 
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
 
+  // OneSignal 푸시 알림 전송 (REST API)
+  const OS_APP_ID   = "26e9e8f3-42a8-4553-b8ef-0a84714db091";       // ← OneSignal App ID
+  const OS_API_KEY  = "dynhfzf6ruawneihwy3ifrtif"; // ← OneSignal REST API Key
+
+  const pushNotif = (title, body) => {
+    fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Authorization":`Basic ${OS_API_KEY}` },
+      body: JSON.stringify({
+        app_id: OS_APP_ID,
+        included_segments: ["All"],
+        headings: { ko: title, en: title },
+        contents: { ko: body,  en: body  },
+        url: window.location.href,
+      })
+    }).catch(()=>{}); // 실패해도 채팅은 계속 동작
+  };
+
   const send=()=>{
     if(!input.trim())return;
     const msg={id:Date.now(),sender:user.name,text:input.trim(),room,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric"})};
-    db.ref(`chat/${room}/${msg.id}`).set(msg); setInput("");
+    db.ref(`chat/${room}/${msg.id}`).set(msg);
+    pushNotif(`[${room}] ${user.name}`, input.trim());
+    setInput("");
   };
 
   // 이미지 업로드
@@ -1035,6 +1075,7 @@ function Chat({user,members}) {
       const url=await ref.getDownloadURL();
       const msg={id:Date.now(),sender:user.name,imgUrl:url,text:"",room,time:new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}),date:new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric"})};
       db.ref(`chat/${room}/${msg.id}`).set(msg);
+      pushNotif(`[${room}] ${user.name}`, "📷 사진을 보냈어요");
     }catch(err){alert("업로드 실패: "+err.message);}
     setUploading(false);
     e.target.value="";
