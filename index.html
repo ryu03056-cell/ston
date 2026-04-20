@@ -1074,21 +1074,20 @@ function Chat({user,members}) {
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
 
   // OneSignal 푸시 알림 전송 (REST API)
-  const OS_APP_ID   = "26e9e8f3-42a8-4553-b8ef-0a84714db091";
-  const OS_API_KEY  = "os_v2_app_e3u6r42cvbcvhohpbkchctnqshqaccue7m3u3ov3optghtublkcz55mpgfkmorzhk4rfmcg2ch3qquydcgea4dlmksix3hgufcd7hyy";
+  const VERCEL_NOTIFY_URL = "https://ryu03056-cell-github-io.vercel.app/api/notify";
 
   const pushNotif = (title, body) => {
-    // Firebase에 알림 요청 저장 → 다른 기기가 수신해서 OneSignal에 전달
-    const notifRef = db.ref("pendingNotif").push();
-    notifRef.set({
-      title, body,
-      t: Date.now(),
-      app_id: OS_APP_ID,
-      api_key: OS_API_KEY,
-      url: window.location.origin
-    });
-    // 30초 후 자동 삭제
-    setTimeout(() => notifRef.remove(), 30000);
+    fetch(VERCEL_NOTIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body, url: window.location.origin })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.id) console.log('✅ 알림 전송:', d.id, '수신자:', d.recipients);
+      else console.warn('알림 오류:', JSON.stringify(d));
+    })
+    .catch(e => console.warn('알림 실패:', e));
   };
 
   const send=()=>{
@@ -1601,30 +1600,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
         serviceWorkerParam: { scope: "/" },
       });
       console.log('✅ OneSignal 초기화 완료');
-
-      // pendingNotif 감지 → OneSignal 알림 전송 (CORS 우회)
-      firebase.database().ref("pendingNotif").on("child_added", function(snap) {
-        const d = snap.val();
-        if (!d || !d.api_key) return;
-        if (Date.now() - (d.t||0) > 30000) { snap.ref.remove(); return; }
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "https://onesignal.com/api/v1/notifications", true);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.setRequestHeader("Authorization", "Key " + d.api_key);
-        xhr.onreadystatechange = function() {
-          if (xhr.readyState === 4) {
-            console.log("✅ OneSignal 응답:", xhr.status, xhr.responseText.substring(0,100));
-            snap.ref.remove();
-          }
-        };
-        xhr.send(JSON.stringify({
-          app_id: d.app_id,
-          included_segments: ["Total Subscriptions"],
-          headings: { ko: d.title, en: d.title },
-          contents: { ko: d.body, en: d.body },
-          url: d.url || window.location.origin
-        }));
-      });
     });
   });
 </script>
