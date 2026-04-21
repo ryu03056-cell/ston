@@ -252,7 +252,7 @@ function SiteManager({rows,setRows,members,isAdmin}) {
     toastTimer.current=setTimeout(()=>setToast(null),2800);
   };
 
-  const fCols=["점검종류","지역","학교명","납품방법"];
+  const fCols=["점검종류","지역","학교명"];
   const uniq=col=>[...new Set(rows.map(r=>r[col]).filter(Boolean))].sort();
   const isFilt=col=>colF[col]&&colF[col].size>0;
   const togCol=(col,val)=>setColF(p=>{const s=new Set(p[col]||[]);s.has(val)?s.delete(val):s.add(val);return{...p,[col]:s};});
@@ -385,10 +385,10 @@ function SiteManager({rows,setRows,members,isAdmin}) {
 
   const hdrs=[
     {k:"no",l:"No."},{k:"점검종류",l:"점검종류",f:true},{k:"지역",l:"지역",f:true},
-    {k:"학교명",l:"학교명",f:true},{k:"시설명",l:"시설명"},{k:"동수",l:"동수"},
+    {k:"학교명",l:"학교명",f:true},{k:"시설명",l:"시설명"},
     {k:"연면적",l:"연면적(㎡)"},{k:"현장조사",l:"현장조사일"},{k:"착수일",l:"착수일"},
     {k:"완수일",l:"완수일"},{k:"출력기간",l:"D-Day"},{k:"특기사항",l:"특기사항"},
-    {k:"납품방법",l:"납품방법",f:true},{k:"lead",l:"담당"},{k:"progress",l:"진행단계"},
+    {k:"lead",l:"담당"},{k:"progress",l:"진행단계"},
     {k:"status",l:"상태"},{k:"actions",l:"관리"},
   ];
 
@@ -494,13 +494,24 @@ function SiteManager({rows,setRows,members,isAdmin}) {
                 <React.Fragment key={g.학교명}>
                   {/* 학교 헤더 행 */}
                   <tr onClick={()=>togSch(g.학교명)} style={{cursor:"pointer",background:isOpen?"#eff6ff":"#f8fafc",borderBottom:"1px solid #e5e7eb",borderTop:"2px solid #e5e7eb"}}>
-                    <td colSpan={17} style={{padding:"10px 14px"}}>
+                    <td colSpan={16} style={{padding:"10px 14px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                         <span style={{fontSize:13,color:"#475569",width:16,textAlign:"center"}}>{isOpen?"▼":"▶"}</span>
                         <span style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>🏫 {g.학교명}</span>
                         {g.지역&&<span style={{fontSize:11,color:"#64748b"}}>{g.지역}</span>}
                         <span style={{background:"#e0e7ff",color:"#4338ca",fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:20}}>{g.rows.length}개 동</span>
                         <span style={{fontSize:11,color:"#475569"}}>연면적 <strong style={{color:"#0f172a"}}>{g.연면적합?g.연면적합.toLocaleString():0}㎡</strong></span>
+                        {(()=>{
+                          const nm=g.rows[0]?.납품방법||"현장납품";
+                          const next=nm==="현장납품"?"택배납품":"현장납품";
+                          return(
+                            <span onClick={e=>{e.stopPropagation();const u=rows.map(r=>g.rows.some(gr=>gr.id===r.id)?{...r,납품방법:next}:r);update(u);}}
+                              title="클릭하면 납품방법 전체 변경"
+                              style={{background:nm==="현장납품"?"#eff6ff":"#f5f3ff",color:nm==="현장납품"?"#1d4ed8":"#7c3aed",border:`1px solid ${nm==="현장납품"?"#bfdbfe":"#ddd6fe"}`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:700,cursor:"pointer",userSelect:"none"}}>
+                              {nm==="현장납품"?"🏫 현장납품":"📦 택배납품"}
+                            </span>
+                          );
+                        })()}
                         <span style={{marginLeft:"auto",background:urgBg(minD),color:urgC(minD),borderRadius:20,padding:"2px 11px",fontWeight:700,fontSize:12}}>{dLabel(minD)}</span>
                       </div>
                     </td>
@@ -515,7 +526,6 @@ function SiteManager({rows,setRows,members,isAdmin}) {
                         <td style={{padding:"9px 8px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.지역}</td>
                         <td style={{padding:"9px 8px",fontWeight:700,borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap",color:"#94a3b8"}}>{r.학교명}</td>
                         <td style={{padding:"9px 8px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.시설명}</td>
-                        <td style={{padding:"9px 8px",textAlign:"center",borderRight:"1px solid #f1f5f9"}}>{r.동수}</td>
                         <td style={{padding:"9px 8px",textAlign:"right",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
                         <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.현장조사?<span style={{color:"#1d4ed8",fontWeight:600}}>{r.현장조사}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
                         <td style={{padding:"9px 8px",color:"#475569",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}>{r.착수일||<span style={{color:"#d1d5db"}}>-</span>}</td>
@@ -524,7 +534,6 @@ function SiteManager({rows,setRows,members,isAdmin}) {
                           <span style={{background:urgBg(d),color:urgC(d),borderRadius:20,padding:"2px 9px",fontWeight:700,fontSize:11}}>{dLabel(d)}</span>
                         </td>
                         <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",maxWidth:100}}>{r.특기사항?<span style={{background:"#fff7ed",color:"#92400e",borderRadius:6,padding:"2px 5px",fontSize:10}}>{r.특기사항}</span>:<span style={{color:"#d1d5db"}}>-</span>}</td>
-                        <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9",whiteSpace:"nowrap"}}><span style={{fontSize:11,fontWeight:600,color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed"}}>{r.납품방법==="현장납품"?"🏫 현장":"📦 택배"}</span></td>
                         <td style={{padding:"9px 8px",borderRight:"1px solid #f1f5f9"}}>
                           {r.lead?<div style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={18}/><span style={{fontSize:11}}>{r.lead}</span></div>:<span style={{color:"#d1d5db",fontSize:11}}>미배정</span>}
                         </td>
@@ -626,7 +635,7 @@ function SiteManager({rows,setRows,members,isAdmin}) {
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                 <thead><tr style={{background:"#f8fafc"}}>
-                  {["상태","점검종류","지역","학교명","시설명","동수","연면적","현장조사일","완수일","납품방법"].map(h=>
+                  {["상태","점검종류","지역","학교명","시설명","연면적","현장조사일","완수일","납품방법"].map(h=>
                     <th key={h} style={{padding:"8px 10px",textAlign:"left",color:"#64748b",fontWeight:600,fontSize:10,whiteSpace:"nowrap",borderBottom:"2px solid #e2e8f0"}}>{h}</th>)}
                 </tr></thead>
                 <tbody>{preview.map((r,i)=>{
@@ -645,7 +654,6 @@ function SiteManager({rows,setRows,members,isAdmin}) {
                     <td style={{padding:"7px 10px",color:"#475569"}}>{r.지역||"-"}</td>
                     <td style={{padding:"7px 10px",fontWeight:700}}>{r.학교명}</td>
                     <td style={{padding:"7px 10px",color:"#475569"}}>{r.시설명||"-"}</td>
-                    <td style={{padding:"7px 10px",textAlign:"center"}}>{r.동수}</td>
                     <td style={{padding:"7px 10px",textAlign:"right",color:isUpdate?"#7c3aed":"inherit",fontWeight:isUpdate?700:400}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
                     <td style={{padding:"7px 10px",color:"#1d4ed8",fontWeight:600}}>{r.현장조사||"-"}</td>
                     <td style={{padding:"7px 10px",color:"#ea580c",fontWeight:600}}>{r.완수일||"-"}</td>
