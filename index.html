@@ -290,29 +290,41 @@ function SiteManager({rows,setRows,members,isAdmin}) {
         const wb=XLSX.read(ev.target.result,{type:"array"});
         const ws=wb.Sheets[wb.SheetNames[0]];
         const data=XLSX.utils.sheet_to_json(ws,{defval:""});
+        // 컬럼명 정규화 함수: 공백/괄호/단위 제거하고 소문자로
+        const norm=s=>String(s||"").toLowerCase().replace(/[\s()㎡m²2]/g,"");
+        // 각 행의 키를 정규화한 맵으로 변환 → 어떤 표기든 매칭
+        const findVal=(row,...candidates)=>{
+          const keys=Object.keys(row);
+          for(const cand of candidates){
+            const target=norm(cand);
+            const hit=keys.find(k=>norm(k)===target);
+            if(hit && row[hit]!=="" && row[hit]!=null) return row[hit];
+          }
+          return "";
+        };
         const parsed=data.map((r,i)=>({
           id:`r_${Date.now()}_${i}`,
-          no:r["No."]||r["NO"]||i+1,
-          점검종류:r["점검종류"]||"",
-          지역:r["지역"]||"",
-          학교명:r["학교명"]||"",
-          시설명:r["시설명"]||"",
-          동수:parseInt(r["동수"])||0,
-          연면적:parseFloat(r["연면적(m²)"]||r["연면적"])||0,
-          현장조사:parseExcelDate(r["현장조사"]||r["현장조사일"]||""),
-          착수일:parseExcelDate(r["착수일"]||""),
-          완수일:parseExcelDate(r["완수일"]||""),
-          FMS:r["FMS 아이디/비번"]||r["FMS"]||"",
-          특기사항:r["특기사항"]||"",
-          납품방법:r["납품방법"]||"현장납품",
-          lead:r["담당자"]||members[0]||"",
+          no:findVal(r,"No.","NO","번호")||i+1,
+          점검종류:findVal(r,"점검종류")||"",
+          지역:findVal(r,"지역","주소")||"",
+          학교명:findVal(r,"학교명","학교","현장명")||"",
+          시설명:findVal(r,"시설명","건물명","동")||"",
+          동수:parseInt(findVal(r,"동수"))||0,
+          연면적:parseFloat(findVal(r,"연면적(m²)","연면적(㎡)","연면적","연면적m2","연면적m²","면적"))||0,
+          현장조사:parseExcelDate(findVal(r,"현장조사","현장조사일")),
+          착수일:parseExcelDate(findVal(r,"착수일")),
+          완수일:parseExcelDate(findVal(r,"완수일")),
+          FMS:findVal(r,"FMS 아이디/비번","FMS","FMS아이디")||"",
+          특기사항:findVal(r,"특기사항","비고")||"",
+          납품방법:findVal(r,"납품방법")||"현장납품",
+          lead:findVal(r,"담당자","담당")||members[0]||"",
           progress:0,
-          status:r["상태"]||(parseInt(r["진행단계"]||0)===6?"완료":parseInt(r["진행단계"]||0)>0?"진행중":"예정"),
-          계약금액:parseInt(r["계약금액"])||0,
+          status:findVal(r,"상태")||(parseInt(findVal(r,"진행단계")||0)===6?"완료":parseInt(findVal(r,"진행단계")||0)>0?"진행중":"예정"),
+          계약금액:parseInt(findVal(r,"계약금액"))||0,
           현장참여:[]
         })).filter(r=>r.학교명);
         setPreview(parsed);
-      }catch(err){alert("파일을 읽을 수 없어요.");}
+      }catch(err){alert("파일을 읽을 수 없어요: "+err.message);}
     };
     reader.readAsArrayBuffer(file); e.target.value="";
   };
