@@ -86,23 +86,14 @@ async function registerOneSignal(userName) {
 // OneSignal로 푸시 알림 전송 (본인 제외)
 async function sendOneSignalNotif(title, body, room, senderName) {
   try {
-    await fetch('https://onesignal.com/api/v1/notifications', {
+    await fetch('https://ston03.ryu03056.workers.dev', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${ONESIGNAL_API_KEY}`
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        headings: { ko: title, en: title },
-        contents: { ko: body, en: body },
-        included_segments: ['Total Subscriptions'],
-        filters: [
-          { field: 'tag', key: 'username', relation: '!=', value: senderName }
-        ],
-        url: 'https://ryu03056-cell.github.io/',
-        chrome_web_icon: 'https://em-content.zobj.net/source/apple/391/school_1f3eb.png',
-        data: { room: room || '' }
+        title,
+        body,
+        room: room || '',
+        sender: senderName || ''
       })
     });
   } catch(e) {
