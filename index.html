@@ -93,7 +93,20 @@ const parseExcelDate = val => {
 };
 
 /* ── Firebase 쓰기 ── */
-const fbRows     = rows => { const o={}; rows.forEach(r=>{o[r.id]=r;}); db.ref("rows").set(o); };
+const fbRows = rows => {
+  const o={};
+  rows.forEach(r=>{
+    // undefined 값은 Firebase에 저장 안 되므로 명시적으로 기본값 설정
+    o[r.id]={
+      ...r,
+      연면적: parseFloat(r.연면적)||0,
+      동수: parseInt(r.동수)||0,
+      progress: r.progress||0,
+      계약금액: parseInt(r.계약금액)||0,
+    };
+  });
+  db.ref("rows").set(o);
+};
 const fbSettings = (k,v) => db.ref(`settings/${k}`).set(v);
 
 /* ── 엑셀 내보내기 ── */
@@ -1774,7 +1787,12 @@ function App() {
 
     rowsRef.on("value", snap=>{
       const data=snap.val();
-      if(data) setRows(Object.values(data).sort((a,b)=>(a.no||0)-(b.no||0)));
+      if(data){
+        const loaded=Object.values(data)
+          .sort((a,b)=>(a.no||0)-(b.no||0))
+          .map(r=>({...r, 연면적:parseFloat(r.연면적)||0, 동수:parseInt(r.동수)||0}));
+        setRows(loaded);
+      }
       else setRows([]);
       setRowsLoaded(true); // ← rows 로드 완료
     });
