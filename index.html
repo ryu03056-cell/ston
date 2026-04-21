@@ -542,22 +542,34 @@ function SiteManager({rows,setRows,members,isAdmin}) {
         const norm=s=>(s||"").toString().trim().toLowerCase();
         const existsSet=new Set(rows.map(r=>`${norm(r.학교명)}||${norm(r.지역)}`));
         const toAdd=preview.filter(r=>r.학교명&&!existsSet.has(`${norm(r.학교명)}||${norm(r.지역)}`));
-        // 기존에 있는데 연면적이 다른 것들 (업데이트 대상)
+        // 기존에 있는 행 중 엑셀에 연면적이 있으면 무조건 업데이트 대상
         const toUpdate=preview.filter(r=>{
           if(!r.학교명||!existsSet.has(`${norm(r.학교명)}||${norm(r.지역)}`))return false;
-          // 같은 학교명+지역+시설명 행 찾기
-          const match=rows.find(w=>norm(w.학교명)===norm(r.학교명)&&norm(w.지역)===norm(r.지역)&&norm(w.시설명)===norm(r.시설명));
-          return match && r.연면적 && parseFloat(r.연면적)!==parseFloat(match.연면적||0);
+          const match=rows.find(w=>
+            norm(w.학교명)===norm(r.학교명)&&
+            norm(w.지역)===norm(r.지역)&&
+            norm(w.시설명)===norm(r.시설명)
+          );
+          // 매칭되는 행이 있고, 엑셀에 연면적이 0보다 크면 업데이트 대상
+          return match && parseFloat(r.연면적)>0;
         });
         const skipped=preview.length-toAdd.length-toUpdate.length;
         const doImport=()=>{
           const maxNo=rows.reduce((m,r)=>Math.max(m,r.no||0),0);
-          // 기존 행 중 연면적 업데이트 대상 처리
+          // 기존 행 연면적+동수 업데이트
           let updated=[...rows];
           toUpdate.forEach(ex=>{
             updated=updated.map(w=>{
-              if(norm(w.학교명)===norm(ex.학교명)&&norm(w.지역)===norm(ex.지역)&&norm(w.시설명)===norm(ex.시설명)){
-                return {...w, 연면적:parseFloat(ex.연면적)||0};
+              if(
+                norm(w.학교명)===norm(ex.학교명)&&
+                norm(w.지역)===norm(ex.지역)&&
+                norm(w.시설명)===norm(ex.시설명)
+              ){
+                return {
+                  ...w,
+                  연면적: parseFloat(ex.연면적)||w.연면적||0,
+                  동수: parseInt(ex.동수)||w.동수||0,
+                };
               }
               return w;
             });
