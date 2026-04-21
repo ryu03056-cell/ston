@@ -473,8 +473,7 @@ function SiteManager({rows,setRows,members,isAdmin}) {
                         <span style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>🏫 {g.학교명}</span>
                         {g.지역&&<span style={{fontSize:11,color:"#64748b"}}>{g.지역}</span>}
                         <span style={{background:"#e0e7ff",color:"#4338ca",fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:20}}>{g.rows.length}개 동</span>
-                        <span style={{fontSize:11,color:"#475569"}}>동수 합계 <strong style={{color:"#0f172a"}}>{g.동수합}</strong></span>
-                        <span style={{fontSize:11,color:"#475569"}}>연면적 합계 <strong style={{color:"#0f172a"}}>{g.연면적합?g.연면적합.toLocaleString():0}㎡</strong></span>
+                        <span style={{fontSize:11,color:"#475569"}}>연면적 <strong style={{color:"#0f172a"}}>{g.연면적합?g.연면적합.toLocaleString():0}㎡</strong></span>
                         <span style={{marginLeft:"auto",background:urgBg(minD),color:urgC(minD),borderRadius:20,padding:"2px 11px",fontWeight:700,fontSize:12}}>{dLabel(minD)}</span>
                       </div>
                     </td>
@@ -530,14 +529,35 @@ function SiteManager({rows,setRows,members,isAdmin}) {
         const norm=s=>(s||"").toString().trim().toLowerCase();
         const existsSet=new Set(rows.map(r=>`${norm(r.학교명)}||${norm(r.지역)}`));
         const toAdd=preview.filter(r=>r.학교명&&!existsSet.has(`${norm(r.학교명)}||${norm(r.지역)}`));
-        const skipped=preview.length-toAdd.length;
+        // 기존에 있는데 연면적이 다른 것들 (업데이트 대상)
+        const toUpdate=preview.filter(r=>{
+          if(!r.학교명||!existsSet.has(`${norm(r.학교명)}||${norm(r.지역)}`))return false;
+          // 같은 학교명+지역+시설명 행 찾기
+          const match=rows.find(w=>norm(w.학교명)===norm(r.학교명)&&norm(w.지역)===norm(r.지역)&&norm(w.시설명)===norm(r.시설명));
+          return match && r.연면적 && parseFloat(r.연면적)!==parseFloat(match.연면적||0);
+        });
+        const skipped=preview.length-toAdd.length-toUpdate.length;
         const doImport=()=>{
           const maxNo=rows.reduce((m,r)=>Math.max(m,r.no||0),0);
-          // 웹 기존 데이터는 절대 수정 안 함 - 새 것만 기존 뒤에 추가
+          // 기존 행 중 연면적 업데이트 대상 처리
+          let updated=[...rows];
+          toUpdate.forEach(ex=>{
+            updated=updated.map(w=>{
+              if(norm(w.학교명)===norm(ex.학교명)&&norm(w.지역)===norm(ex.지역)&&norm(w.시설명)===norm(ex.시설명)){
+                return {...w, 연면적:parseFloat(ex.연면적)||0};
+              }
+              return w;
+            });
+          });
+          // 새 항목 추가
           const appended=toAdd.map((r,i)=>({...r,no:maxNo+i+1,id:`r_${Date.now()}_${i}`,납품일:r.납품일||""}));
-          update([...rows,...appended]);
+          update([...updated,...appended]);
           setPreview(null);
-          showToast(`${appended.length}개 추가됨${skipped>0?` · ${skipped}개 중복 스킵`:""}`);
+          const msgs=[];
+          if(appended.length>0)msgs.push(`${appended.length}개 신규 추가`);
+          if(toUpdate.length>0)msgs.push(`${toUpdate.length}개 연면적 업데이트`);
+          if(skipped>0)msgs.push(`${skipped}개 스킵`);
+          showToast(msgs.join(" · "));
         };
         return(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300}}>
@@ -546,17 +566,23 @@ function SiteManager({rows,setRows,members,isAdmin}) {
               <div>
                 <h2 style={{margin:0,fontSize:17,fontWeight:700}}>📤 엑셀 업로드 미리보기</h2>
                 <p style={{margin:"4px 0 0",fontSize:12,color:"#64748b"}}>
-                  엑셀 {preview.length}개 · <span style={{color:"#16a34a",fontWeight:600}}>새로 추가 {toAdd.length}개</span> · <span style={{color:"#94a3b8"}}>중복 스킵 {skipped}개</span>
+                  엑셀 {preview.length}개 ·{" "}
+                  <span style={{color:"#16a34a",fontWeight:600}}>✨ 신규 {toAdd.length}개</span> ·{" "}
+                  <span style={{color:"#7c3aed",fontWeight:600}}>📐 연면적 업데이트 {toUpdate.length}개</span> ·{" "}
+                  <span style={{color:"#94a3b8"}}>스킵 {skipped}개</span>
                 </p>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>setPreview(null)} style={{padding:"7px 14px",borderRadius:8,border:"1px solid #e5e7eb",background:"#fff",fontSize:13,cursor:"pointer"}}>취소</button>
-                <button onClick={doImport} disabled={toAdd.length===0} style={{padding:"7px 16px",borderRadius:8,border:"none",background:toAdd.length===0?"#cbd5e1":"#16a34a",color:"#fff",fontSize:13,fontWeight:600,cursor:toAdd.length===0?"not-allowed":"pointer"}}>✅ {toAdd.length}개 추가하기</button>
+                <button onClick={doImport} disabled={toAdd.length===0&&toUpdate.length===0}
+                  style={{padding:"7px 16px",borderRadius:8,border:"none",background:(toAdd.length===0&&toUpdate.length===0)?"#cbd5e1":"#16a34a",color:"#fff",fontSize:13,fontWeight:600,cursor:(toAdd.length===0&&toUpdate.length===0)?"not-allowed":"pointer"}}>
+                  ✅ {toAdd.length>0&&`${toAdd.length}개 추가`}{toAdd.length>0&&toUpdate.length>0&&" · "}{toUpdate.length>0&&`${toUpdate.length}개 업데이트`}
+                </button>
               </div>
             </div>
             {/* 안내 */}
             <div style={{background:"#f0fdf4",borderRadius:8,padding:"10px 14px",border:"1px solid #86efac",fontSize:12,color:"#15803d",marginBottom:14}}>
-              ✅ <strong>학교명 + 지역 중복은 자동 스킵</strong>돼요. 웹에 있는 기존 데이터는 절대 수정되지 않고, 새 항목만 목록 맨 아래에 추가돼요.
+              ✅ <strong>신규:</strong> 웹에 없는 학교는 추가돼요 · <strong style={{color:"#7c3aed"}}>연면적 업데이트:</strong> 같은 학교/동인데 연면적이 다르면 엑셀 값으로 업데이트돼요 · 나머지 정보(날짜 등)는 웹 데이터 유지
             </div>
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
@@ -566,19 +592,22 @@ function SiteManager({rows,setRows,members,isAdmin}) {
                 </tr></thead>
                 <tbody>{preview.map((r,i)=>{
                   const isDup=existsSet.has(`${norm(r.학교명)}||${norm(r.지역)}`);
+                  const isUpdate=toUpdate.some(u=>norm(u.학교명)===norm(r.학교명)&&norm(u.지역)===norm(r.지역)&&norm(u.시설명)===norm(r.시설명));
                   return(
-                  <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:isDup?"#f9fafb":i%2?"#fafafa":"#fff",opacity:isDup?0.5:1}}>
+                  <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:isUpdate?"#faf5ff":isDup?"#f9fafb":i%2?"#fafafa":"#fff",opacity:isDup&&!isUpdate?0.45:1}}>
                     <td style={{padding:"7px 10px"}}>
-                      {isDup
-                        ?<span style={{background:"#e2e8f0",color:"#64748b",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>🚫 중복</span>
-                        :<span style={{background:"#dcfce7",color:"#16a34a",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>✨ 신규</span>}
+                      {isUpdate
+                        ?<span style={{background:"#ede9fe",color:"#7c3aed",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>📐 연면적↑</span>
+                        :isDup
+                          ?<span style={{background:"#e2e8f0",color:"#64748b",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>🚫 스킵</span>
+                          :<span style={{background:"#dcfce7",color:"#16a34a",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:600}}>✨ 신규</span>}
                     </td>
                     <td style={{padding:"7px 10px"}}><span style={{background:"#ede9fe",color:"#7c3aed",borderRadius:20,padding:"2px 7px",fontSize:10,fontWeight:600}}>{r.점검종류||"-"}</span></td>
                     <td style={{padding:"7px 10px",color:"#475569"}}>{r.지역||"-"}</td>
                     <td style={{padding:"7px 10px",fontWeight:700}}>{r.학교명}</td>
                     <td style={{padding:"7px 10px",color:"#475569"}}>{r.시설명||"-"}</td>
                     <td style={{padding:"7px 10px",textAlign:"center"}}>{r.동수}</td>
-                    <td style={{padding:"7px 10px",textAlign:"right"}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
+                    <td style={{padding:"7px 10px",textAlign:"right",color:isUpdate?"#7c3aed":"inherit",fontWeight:isUpdate?700:400}}>{r.연면적?r.연면적.toLocaleString():"-"}</td>
                     <td style={{padding:"7px 10px",color:"#1d4ed8",fontWeight:600}}>{r.현장조사||"-"}</td>
                     <td style={{padding:"7px 10px",color:"#ea580c",fontWeight:600}}>{r.완수일||"-"}</td>
                     <td style={{padding:"7px 10px",color:r.납품방법==="현장납품"?"#1d4ed8":"#7c3aed",fontWeight:600}}>{r.납품방법==="현장납품"?"🏫":"📦"} {r.납품방법}</td>
