@@ -64,8 +64,8 @@ async function registerFCMToken(userName) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
   if (typeof firebase.messaging !== 'function') return null;
   try {
-    const sw = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    await navigator.serviceWorker.ready;
+const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+await swReg.update();
     const messaging = firebase.messaging();
     messaging.useServiceWorker(sw);
     const token = await messaging.getToken({ vapidKey: VAPID_KEY });
