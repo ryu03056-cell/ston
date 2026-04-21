@@ -56,52 +56,63 @@ const db = firebase.database();
 const storage = firebase.storage();
 
 // FCM 초기화 (서비스워커 지원 환경에서만)
-const VAPID_KEY = "BNDfK2ZTTQkSESXVdBSegDcFgOvQyUtAbG9PmHKBTPF5y0xFwC9Glvqc5oA1M_4naSavx_nNnWK3d93jNPJ8Ylw";
-const VERCEL_NOTIFY = "https://ryu03056-cell-github-io.vercel.app/api/notify-fcm";
+const ONESIGNAL_APP_ID = "26e9e8f3-42a8-4553-b8ef-0a84714db091";
+const ONESIGNAL_API_KEY = "os_v2_app_e3u6r42cvbcvhohpbkchctnqsei7c6kzsydut2ey2yyer4c3uvlh3o6n62ahvhrtuxjojjl76gulz63zsr3bfaglvawr35jeknogbyi";
 
-// FCM 토큰을 Firebase에 저장 (사용자별)
-async function registerFCMToken(userName) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
-  if (typeof firebase.messaging !== 'function') return null;
-  try {
-    const swReg = await navigator.serviceWorker.ready;
-    const msg = firebase.messaging();
-    const token = await msg.getToken({
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swReg
+// OneSignal 초기화
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({
+    appId: ONESIGNAL_APP_ID,
+    notifyButton: { enable: false },
+    allowLocalhostAsSecureOrigin: true
+  });
+  console.log('✅ OneSignal 초기화 완료');
+});
+
+// OneSignal에 사용자 등록 (로그인 시 호출)
+async function registerOneSignal(userName) {
+  if (!window.OneSignalDeferred) return false;
+  return new Promise((resolve) => {
+    OneSignalDeferred.push(async function(OneSignal) {
+      try {
+        const perm = await OneSignal.Notifications.requestPermission();
+        await OneSignal.login(userName);
+        await OneSignal.User.addTag('username', userName);
+        console.log('✅ OneSignal 사용자 등록:', userName);
+        resolve(true);
+      } catch(e) {
+        console.warn('OneSignal 등록 실패:', e.message);
+        resolve(false);
+      }
     });
-    if (token && userName) {
-      await db.ref(`fcmTokens/${encodeURIComponent(userName)}`).set({
-        token, updatedAt: Date.now()
-      });
-      console.log('✅ FCM 토큰 등록 완료');
-    }
-    return token;
-  } catch(e) {
-    console.warn('FCM 토큰 등록 실패:', e.message);
-    return null;
-  }
+  });
 }
 
-// 모든 등록된 토큰으로 푸시 알림 전송
-async function sendFCMNotif(title, body, room, senderName) {
+// OneSignal로 푸시 알림 전송 (본인 제외)
+async function sendOneSignalNotif(title, body, room, senderName) {
   try {
-    const snap = await db.ref('fcmTokens').once('value');
-    const data = snap.val();
-    if (!data) return;
-    // 보낸 사람 제외한 토큰 수집
-    const tokens = Object.entries(data)
-      .filter(([name]) => decodeURIComponent(name) !== senderName)
-      .map(([, v]) => v.token)
-      .filter(Boolean);
-    if (tokens.length === 0) return;
-    await fetch(VERCEL_NOTIFY, {
+    await fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body, tokens, room })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${ONESIGNAL_API_KEY}`
+      },
+      body: JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        headings: { ko: title, en: title },
+        contents: { ko: body, en: body },
+        included_segments: ['Total Subscriptions'],
+        filters: [
+          { field: 'tag', key: 'username', relation: '!=', value: senderName }
+        ],
+        url: 'https://ryu03056-cell.github.io/',
+        chrome_web_icon: 'https://em-content.zobj.net/source/apple/391/school_1f3eb.png',
+        data: { room: room || '' }
+      })
     });
   } catch(e) {
-    console.warn('FCM 알림 전송 실패:', e.message);
+    console.warn('OneSignal 전송 실패:', e.message);
   }
 }
 </script>
