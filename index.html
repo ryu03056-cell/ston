@@ -64,9 +64,9 @@ async function registerFCMToken(userName) {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
   if (typeof firebase.messaging !== 'function') return null;
   try {
-    const swReg = await navigator.serviceWorker.ready; // ← ready 사용 (sw.js가 반환됨)
-    if (!_fcmMessaging) _fcmMessaging = firebase.messaging();
-    const token = await _fcmMessaging.getToken({
+    const swReg = await navigator.serviceWorker.ready;
+    const msg = firebase.messaging();
+    const token = await msg.getToken({
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: swReg
     });
