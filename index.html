@@ -1138,6 +1138,7 @@ function UrgentReport({rows,setRows}) {
                   <div style={{fontWeight:700,fontSize:14,marginBottom:4,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     <span style={{fontSize:13,color:"#475569"}}>{isOpen?"▼":"▶"}</span>
                     🏫 {g.학교명}
+                    {g.rows.some(r=>r.신규)&&<span style={{background:"linear-gradient(135deg,#f97316,#dc2626)",color:"#fff",fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:20,letterSpacing:0.5,boxShadow:"0 1px 3px rgba(220,38,38,0.3)"}}>🆕 NEW</span>}
                     {g.지역&&<span style={{fontSize:11,color:"#64748b",fontWeight:400}}>{g.지역}</span>}
                   </div>
                   <div style={{display:"flex",gap:12,fontSize:11,color:"#64748b",flexWrap:"wrap"}}>
@@ -1842,6 +1843,31 @@ function Overview({rows,total,done,urgCnt,delayed}) {
       {label}
     </button>
   );
+  // 🚨 3일 이내 완수 보고서 (D-3 이하 + 지연 포함, 완료 제외)
+  const urgent3 = rows
+    .filter(r=>{
+      if(r.progress===6) return false;
+      const d=diffDays(r.완수일);
+      return d!==null && d<=3;
+    })
+    .sort((a,b)=>{
+      const da=diffDays(a.완수일), db=diffDays(b.완수일);
+      return da-db;
+    });
+
+  // 📦 현장납품 예정 (납품방법=현장납품, 14일 이내, 완료 제외)
+  const siteDeliv = rows
+    .filter(r=>{
+      if(r.progress===6) return false;
+      if((r.납품방법||"현장납품")!=="현장납품") return false;
+      const d=diffDays(r.완수일);
+      return d!==null && d<=14;
+    })
+    .sort((a,b)=>{
+      const da=diffDays(a.완수일), db=diffDays(b.완수일);
+      return da-db;
+    });
+
   return <>
     {/* 통계 카드 */}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
@@ -1852,6 +1878,78 @@ function Overview({rows,total,done,urgCnt,delayed}) {
         </div>
       ))}
     </div>
+
+    {/* 🚨 3일 이내 완수 보고서 알림 */}
+    {urgent3.length>0&&
+      <div style={{background:"linear-gradient(135deg,#fff1f2,#fff7ed)",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",border:"1px solid #fca5a5",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+          <span style={{fontSize:18}}>🚨</span>
+          <span style={{fontSize:14,fontWeight:800,color:"#dc2626"}}>3일 이내 완수 보고서</span>
+          <span style={{background:"#dc2626",color:"#fff",fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:700}}>{urgent3.length}건</span>
+          <span style={{fontSize:11,color:"#94a3b8",marginLeft:"auto"}}>빨리 처리하세요!</span>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {urgent3.map(r=>{
+            const d=diffDays(r.완수일);
+            const isOver = d<0;
+            return(
+              <div key={r.id} style={{background:"#fff",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",borderLeft:`4px solid ${isOver?"#dc2626":d<=1?"#e11d48":"#ea580c"}`}}>
+                <div style={{flex:1,minWidth:150}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span style={{fontWeight:700,fontSize:13}}>{r.학교명}</span>
+                    {r.신규&&<span style={{background:"#dcfce7",color:"#16a34a",borderRadius:4,padding:"1px 5px",fontSize:9,fontWeight:700}}>🆕</span>}
+                    <span style={{fontSize:11,color:"#64748b"}}>· {r.시설명}</span>
+                  </div>
+                  <div style={{display:"flex",gap:8,marginTop:4,alignItems:"center",fontSize:11,color:"#64748b",flexWrap:"wrap"}}>
+                    <span>📍 {r.지역}</span>
+                    {r.lead&&<span style={{display:"flex",alignItems:"center",gap:3}}><Av name={r.lead} size={14}/>{r.lead}</span>}
+                    <span style={{color:"#ea580c",fontWeight:600}}>완수일 {r.완수일}</span>
+                  </div>
+                </div>
+                <div style={{flexShrink:0}}>
+                  <span style={{background:isOver?"#dc2626":d<=1?"#e11d48":"#ea580c",color:"#fff",borderRadius:20,padding:"4px 12px",fontWeight:800,fontSize:13}}>{dLabel(d)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    }
+
+    {/* 📦 현장납품 예정 */}
+    {siteDeliv.length>0&&
+      <div style={{background:"#fff",borderRadius:14,padding:"16px 18px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",border:"1px solid #bfdbfe",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+          <span style={{fontSize:18}}>📦</span>
+          <span style={{fontSize:14,fontWeight:800,color:"#1d4ed8"}}>현장납품 예정 (14일 이내)</span>
+          <span style={{background:"#1d4ed8",color:"#fff",fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:700}}>{siteDeliv.length}건</span>
+          <span style={{fontSize:11,color:"#94a3b8",marginLeft:"auto"}}>🏫 학교 방문 일정</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:8}}>
+          {siteDeliv.map(r=>{
+            const d=diffDays(r.완수일);
+            const bg = d<=3?"#fff1f2":d<=7?"#fff7ed":"#eff6ff";
+            const bc = d<=3?"#fca5a5":d<=7?"#fdba74":"#bfdbfe";
+            const cc = d<=3?"#dc2626":d<=7?"#ea580c":"#1d4ed8";
+            return(
+              <div key={r.id} style={{background:bg,borderRadius:10,padding:"10px 12px",border:`1px solid ${bc}`,display:"flex",alignItems:"center",gap:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
+                    <span style={{fontWeight:700,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.학교명}</span>
+                    {r.신규&&<span style={{background:"#dcfce7",color:"#16a34a",borderRadius:4,padding:"1px 4px",fontSize:8,fontWeight:700,flexShrink:0}}>🆕</span>}
+                  </div>
+                  <div style={{fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    📍 {r.지역} · {r.시설명}
+                  </div>
+                  <div style={{fontSize:10,color:cc,fontWeight:600,marginTop:3}}>{r.완수일}{r.lead&&` · ${r.lead}`}</div>
+                </div>
+                <span style={{background:cc,color:"#fff",borderRadius:16,padding:"3px 9px",fontWeight:800,fontSize:11,flexShrink:0,whiteSpace:"nowrap"}}>{dLabel(d)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    }
 
     {/* 필터 */}
     <div style={{background:"#fff",borderRadius:14,padding:"14px 16px",boxShadow:"0 1px 4px rgba(0,0,0,.07)",marginBottom:16}}>
