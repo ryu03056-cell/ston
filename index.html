@@ -298,6 +298,12 @@ function SiteManager({rows,setRows,members,isAdmin}) {
   const [toast,   setToast]  =useState(null);
   const [expPeriod,setExpPeriod]=useState(new Set()); // 반기 그룹 펼침 상태
   const [expSch,setExpSch]=useState(new Set());       // 학교 펼침 상태
+  const [isMobile,setIsMobile]=useState(typeof window!=="undefined"&&window.innerWidth<768);
+  useEffect(()=>{
+    const h=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",h);
+    return()=>window.removeEventListener("resize",h);
+  },[]);
   const toastTimer=useRef(null);
 
   const showToast=(msg,type="success")=>{
@@ -641,8 +647,93 @@ function SiteManager({rows,setRows,members,isAdmin}) {
         반기그룹 <strong style={{color:"#7c3aed"}}>{periodGroups.length}</strong>개
       </div>
 
-      {/* 테이블 */}
-      <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
+      {/* 테이블 (PC) / 카드 리스트 (모바일) */}
+      {isMobile ? (
+        /* ── 📱 모바일 카드 뷰 ── */
+        <div style={{display:"flex",flexDirection:"column",gap:10}} onClick={e=>e.stopPropagation()}>
+          {periodGroups.map(pg=>{
+            const periodOpen=expPeriod.has(pg.key);
+            return(
+              <div key={pg.key} style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 3px rgba(0,0,0,.05)",overflow:"hidden"}}>
+                {/* 반기 헤더 */}
+                <div onClick={()=>togPeriod(pg.key)}
+                  style={{cursor:"pointer",background:periodOpen?"#1e293b":"#334155",color:"#fff",padding:"12px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  <span style={{fontSize:13,color:"#94a3b8"}}>{periodOpen?"▼":"▶"}</span>
+                  <span style={{fontSize:14,fontWeight:800}}>📅 {pg.label}</span>
+                  <span style={{background:"#475569",color:"#fff",fontSize:11,fontWeight:700,padding:"2px 9px",borderRadius:20,marginLeft:"auto"}}>{pg.schools.length}교 · {pg.totalRows}동</span>
+                </div>
+
+                {/* 학교 카드들 */}
+                {periodOpen && pg.schools.map(g=>{
+                  const schKey = pg.key+":"+g.학교명;
+                  const isOpen = expSch.has(schKey);
+                  const minD=g.rows.reduce((m,r)=>{const d=diffDays(r.완수일);if(d===null)return m;return m===null?d:Math.min(m,d);},null);
+                  const isNew = g.rows.some(r=>r.신규);
+                  const nm=g.rows[0]?.납품방법||"현장납품";
+                  return(
+                    <div key={schKey} style={{borderTop:"1px solid #e2e8f0"}}>
+                      {/* 학교 카드 헤더 */}
+                      <div onClick={()=>togSch(schKey)}
+                        style={{cursor:"pointer",padding:"12px 14px",background:isOpen?"#eff6ff":"#fff"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                          <span style={{fontSize:13,color:"#475569",width:14,textAlign:"center"}}>{isOpen?"▼":"▶"}</span>
+                          <span style={{fontSize:15,fontWeight:700,color:"#0f172a",flex:1,minWidth:0}}>{g.학교명}</span>
+                          {isNew && <span style={{background:"linear-gradient(135deg,#f97316,#dc2626)",color:"#fff",fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:10,letterSpacing:0.5}}>NEW</span>}
+                          {minD!==null && g.rows.some(r=>r.progress!==6) &&
+                            <span style={{background:urgBg(minD),color:urgC(minD),borderRadius:14,padding:"3px 10px",fontWeight:800,fontSize:12,whiteSpace:"nowrap"}}>{minD<0?`지연 ${Math.abs(minD)}`:dLabel(minD)}</span>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12.5,color:"#475569",flexWrap:"wrap",marginLeft:22}}>
+                          {g.지역 && <span>{g.지역}</span>}
+                          <span style={{background:"#e0e7ff",color:"#4338ca",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:14}}>{g.rows.length}개 동</span>
+                          <span>연면적 <strong style={{color:"#0f172a"}}>{g.연면적합?g.연면적합.toLocaleString():0}㎡</strong></span>
+                          <span onClick={e=>{e.stopPropagation();const next=nm==="현장납품"?"택배납품":"현장납품";const u=rows.map(r=>g.rows.some(gr=>gr.id===r.id)?{...r,납품방법:next}:r);update(u);}}
+                            style={{background:nm==="현장납품"?"#eff6ff":"#f5f3ff",color:nm==="현장납품"?"#1d4ed8":"#7c3aed",border:`1px solid ${nm==="현장납품"?"#bfdbfe":"#ddd6fe"}`,borderRadius:14,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                            {nm==="현장납품"?"🏫 현장납품":"📦 택배납품"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 학교 펼쳤을 때: 동(행) 카드들 */}
+                      {isOpen && <div style={{padding:"4px 12px 12px"}}>
+                        {g.rows.map(r=>{
+                          const d=diffDays(r.완수일);
+                          const ss = SS[r.status||"예정"]||{bg:"#f3f4f6",c:"#6b7280"};
+                          return(
+                            <div key={r.id}
+                              onClick={()=>{setEditM(r);setEditF({...r});}}
+                              style={{background:"#f8fafc",borderRadius:10,padding:"11px 13px",marginBottom:6,borderLeft:`4px solid ${urgC(d)||"#cbd5e1"}`,cursor:"pointer"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5,flexWrap:"wrap"}}>
+                                <span style={{fontSize:13.5,fontWeight:700,color:"#0f172a"}}>{r.시설명||"(시설명 없음)"}</span>
+                                {r.종별 && <span style={{fontSize:11,color:"#64748b"}}>· {r.종별}</span>}
+                                <span style={{background:ss.bg,color:ss.c,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:10,marginLeft:"auto"}}>{r.status||"예정"}</span>
+                              </div>
+                              <div style={{fontSize:12,color:"#475569",marginBottom:6}}>
+                                연면적 <strong style={{color:"#0f172a"}}>{r.연면적?r.연면적.toLocaleString():0}㎡</strong>
+                                {r.동수>0 && <> · {r.동수}개 동</>}
+                                {r.높이>0 && <> · 높이 {r.높이}m</>}
+                                {r.길이>0 && <> · 길이 {r.길이}m</>}
+                              </div>
+                              <div style={{marginBottom:8}}><PBar step={r.progress||0} compact/></div>
+                              <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",fontSize:11.5,color:"#475569"}}>
+                                {r.lead && <span style={{display:"flex",alignItems:"center",gap:4}}><Av name={r.lead} size={18}/>{r.lead}</span>}
+                                {r.현장조사 && <span>🔵 {r.현장조사}</span>}
+                                {r.완수일 && <span style={{color:urgC(d),fontWeight:600}}>🟠 {r.완수일} {d!==null&&`(${d<0?`지연${Math.abs(d)}`:dLabel(d)})`}</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {filtered.length===0 && <div style={{background:"#fff",borderRadius:12,padding:40,textAlign:"center",color:"#94a3b8",fontSize:14}}>데이터 없음 — 엑셀 업로드로 추가하세요</div>}
+        </div>
+      ) : (
+        /* ── 🖥 PC 표 뷰 (기존) ── */
+        <div style={{background:"#fff",borderRadius:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:1200}}>
           <thead>
             <tr style={{background:"#0f172a",color:"#fff"}}>
@@ -777,6 +868,7 @@ function SiteManager({rows,setRows,members,isAdmin}) {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* 엑셀 업로드 미리보기 — 기존과 동일 */}
       {preview&&(()=>{
