@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>현장조사팀 대시보드</title>
 <link rel="manifest" href="/manifest.json"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -1939,7 +1939,7 @@ function Chat({user,members}) {
           <input ref={imgRef} type="file" accept="image/*" capture="environment" onChange={handleImg} style={{display:"none"}}/>
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
             placeholder={`${room} 채팅방에 입력...`}
-            style={{flex:1,border:"1px solid #e5e7eb",borderRadius:12,padding:"9px 14px",fontSize:13,outline:"none",background:"#f8fafc"}}/>
+            style={{flex:1,border:"1px solid #e5e7eb",borderRadius:12,padding:"9px 14px",fontSize:16,outline:"none",background:"#f8fafc",fontFamily:"inherit"}}/>
           <button onClick={send} disabled={!input.trim()} style={{padding:"9px 18px",borderRadius:12,border:"none",background:input.trim()?rColors[room]:"#e5e7eb",color:"#fff",fontSize:13,fontWeight:700,cursor:input.trim()?"pointer":"default",fontFamily:"inherit"}}>전송</button>
         </div>
       </div>
