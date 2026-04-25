@@ -1336,6 +1336,7 @@ function Calendar({rows,addPoints,userName}) {
   const [viewMode,setViewMode]=useState("month"); // "month" | "week"
   const [notes,setNotes]=useState({});
   const [noteInput,setNoteInput]=useState("");
+  const [expandedSchools,setExpandedSchools]=useState(new Set()); // 펼친 학교들
   const noteSaveTimer=useRef(null);
   const [isMobile,setIsMobile]=useState(typeof window!=="undefined"&&window.innerWidth<768);
   useEffect(()=>{
@@ -1552,56 +1553,85 @@ function Calendar({rows,addPoints,userName}) {
         {!sel&&<div style={{color:"#94a3b8",fontSize:13.5,textAlign:"center",marginTop:40}}>{isMobile?"↑ 위에서 날짜를 선택하면":"날짜를 선택하면"}<br/>일정이 표시됩니다</div>}
         {sel&&sev.s.length===0&&sev.r.length===0&&sev.d.length===0&&<div style={{color:"#94a3b8",fontSize:13.5,textAlign:"center",marginTop:40,marginBottom:20}}>이 날 예정된 일정이 없어요</div>}
 
-        {sev.s.length>0&&<div style={{marginBottom:14}}>
-          <SectionHead><span style={{width:3,height:13,borderRadius:2,background:"#1e40af"}}/>현장조사 <span style={{fontSize:12,color:"#94a3b8",fontWeight:500}}>{sev.s.length}건</span></SectionHead>
-          {sev.s.map(r=>(
-            <div key={"s_"+r.id} style={{background:"#f8fafc",borderRadius:10,padding:"11px 13px",marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{r.학교명}</div>
-                <div style={{fontSize:12,color:"#475569"}}>{r.시설명} · {r.지역}</div>
-              </div>
-              {r.lead&&<div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}><Av name={r.lead} size={26}/><span style={{fontSize:12.5,fontWeight:600,color:"#475569"}}>{r.lead}</span></div>}
-            </div>
-          ))}
-        </div>}
+        {/* 학교별 합쳐서 보기 — 펼치면 동/시설 상세 */}
+        {(()=>{
+          // 학교별로 합치기 (현장조사/보고서완수/납품 각각)
+          const groupBySchool = (arr) => {
+            const out = {};
+            arr.forEach(r=>{
+              const k = r.학교명||"(이름없음)";
+              if(!out[k]) out[k] = {학교명:k, 지역:r.지역||"", 납품방법:r.납품방법, lead:r.lead, rows:[]};
+              out[k].rows.push(r);
+            });
+            return Object.values(out);
+          };
+          const surveyGroups = groupBySchool(sev.s);
+          const reportGroups = groupBySchool(sev.r);
+          const deliverGroups = groupBySchool(sev.d);
 
-        {sev.r.length>0&&<div style={{marginBottom:14}}>
-          <SectionHead><span style={{width:3,height:13,borderRadius:2,background:"#c2410c"}}/>보고서 완수 <span style={{fontSize:12,color:"#94a3b8",fontWeight:500}}>{sev.r.length}건</span></SectionHead>
-          {sev.r.map(r=>{
-            const d=diffDays(r.완수일);
-            const isUrg = d!==null&&d<=3&&r.progress!==6;
+          const SchoolCard = ({g, color, type}) => {
+            const open = expandedSchools.has(`${type}_${g.학교명}`);
+            const totalArea = g.rows.reduce((s,r)=>s+(r.연면적||0),0);
+            const minD = type==="report" ? g.rows.reduce((m,r)=>{const d=diffDays(r.완수일);if(d===null)return m;return m===null?d:Math.min(m,d);},null) : null;
+            const isUrg = minD!==null && minD<=3 && g.rows.some(r=>r.progress!==6);
             return(
-              <div key={"r_"+r.id} style={{background:"#f8fafc",borderRadius:10,padding:"11px 13px",marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:700,fontSize:14,marginBottom:2,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <span>{r.학교명}</span>
-                    {isUrg&&<span style={{background:"#dc2626",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4}}>{d<0?`지연 ${Math.abs(d)}`:dLabel(d)}</span>}
+              <div key={`${type}_${g.학교명}`} style={{background:"#f8fafc",borderRadius:10,marginBottom:6,overflow:"hidden",border:open?`1.5px solid ${color}`:"1.5px solid transparent"}}>
+                {/* 학교 헤더 */}
+                <div onClick={()=>{
+                    const next=new Set(expandedSchools);
+                    const k = `${type}_${g.학교명}`;
+                    next.has(k) ? next.delete(k) : next.add(k);
+                    setExpandedSchools(next);
+                  }}
+                  style={{padding:"11px 13px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:12,color:"#94a3b8",width:14}}>{open?"▼":"▶"}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:14,marginBottom:2,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                      <span>{g.학교명}</span>
+                      {isUrg&&<span style={{background:"#dc2626",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4}}>{minD<0?`지연 ${Math.abs(minD)}`:dLabel(minD)}</span>}
+                      <span style={{background:"#e0e7ff",color:"#4338ca",fontSize:10.5,fontWeight:700,padding:"2px 7px",borderRadius:10}}>{g.rows.length}개 동</span>
+                    </div>
+                    <div style={{fontSize:12,color:"#475569"}}>
+                      {g.지역}
+                      {totalArea>0 && <> · 연면적 합 <strong style={{color:"#0f172a"}}>{totalArea.toLocaleString()}㎡</strong></>}
+                      {type==="deliver" && <> · {g.납품방법==="현장납품"?"현장납품":"택배납품"}</>}
+                    </div>
                   </div>
-                  <div style={{fontSize:12,color:"#475569"}}>{r.납품방법==="현장납품"?"현장납품":"택배납품"}</div>
+                  {g.lead&&<div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}><Av name={g.lead} size={26}/><span style={{fontSize:12.5,fontWeight:600,color:"#475569"}}>{g.lead}</span></div>}
                 </div>
-                {r.lead&&<div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}><Av name={r.lead} size={26}/><span style={{fontSize:12.5,fontWeight:600,color:"#475569"}}>{r.lead}</span></div>}
+                {/* 펼친 동 목록 */}
+                {open && <div style={{padding:"0 13px 11px",borderTop:"1px dashed #e2e8f0"}}>
+                  {g.rows.map((r,i)=>(
+                    <div key={r.id||i} style={{background:"#fff",borderRadius:8,padding:"9px 11px",marginTop:i===0?9:5,fontSize:12.5}}>
+                      <div style={{fontWeight:700,color:"#0f172a",marginBottom:3}}>{r.시설명||"(시설명 없음)"}{r.종별?<span style={{color:"#64748b",fontWeight:500}}> · {r.종별}</span>:null}</div>
+                      <div style={{color:"#475569",display:"flex",gap:10,flexWrap:"wrap"}}>
+                        {r.연면적>0 && <span>연면적 <strong style={{color:"#0f172a"}}>{r.연면적.toLocaleString()}㎡</strong></span>}
+                        {r.동수>0 && <span>{r.동수}개 동</span>}
+                        {r.높이>0 && <span>높이 {r.높이}m</span>}
+                        {r.길이>0 && <span>길이 {r.길이}m</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>}
               </div>
             );
-          })}
-        </div>}
+          };
 
-        {sev.d.length>0&&<div style={{marginBottom:14}}>
-          <SectionHead><span style={{width:3,height:13,borderRadius:2,background:"#7e22ce"}}/>납품 <span style={{fontSize:12,color:"#94a3b8",fontWeight:500}}>{new Set(sev.d.map(r=>r.학교명)).size}개교</span></SectionHead>
-          {(()=>{
-            const bySchool={};
-            sev.d.forEach(r=>{
-              const k=r.학교명||"(이름없음)";
-              if(!bySchool[k])bySchool[k]={학교명:k,지역:r.지역||"",납품방법:r.납품방법,rows:[]};
-              bySchool[k].rows.push(r);
-            });
-            return Object.values(bySchool).map(g=>(
-              <div key={"d_"+g.학교명} style={{background:"#f8fafc",borderRadius:10,padding:"11px 13px",marginBottom:6}}>
-                <div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{g.학교명}</div>
-                <div style={{fontSize:12,color:"#475569"}}>{g.지역} · {g.rows.length}개 동 · {g.납품방법==="현장납품"?"현장납품":"택배납품"}</div>
-              </div>
-            ));
-          })()}
-        </div>}
+          return <>
+            {surveyGroups.length>0 && <div style={{marginBottom:14}}>
+              <SectionHead><span style={{width:3,height:13,borderRadius:2,background:"#1e40af"}}/>현장조사 <span style={{fontSize:12,color:"#94a3b8",fontWeight:500}}>{surveyGroups.length}개교 · {sev.s.length}동</span></SectionHead>
+              {surveyGroups.map(g=><SchoolCard key={"s_"+g.학교명} g={g} color="#1e40af" type="survey"/>)}
+            </div>}
+            {reportGroups.length>0 && <div style={{marginBottom:14}}>
+              <SectionHead><span style={{width:3,height:13,borderRadius:2,background:"#c2410c"}}/>보고서 완수 <span style={{fontSize:12,color:"#94a3b8",fontWeight:500}}>{reportGroups.length}개교 · {sev.r.length}동</span></SectionHead>
+              {reportGroups.map(g=><SchoolCard key={"r_"+g.학교명} g={g} color="#c2410c" type="report"/>)}
+            </div>}
+            {deliverGroups.length>0 && <div style={{marginBottom:14}}>
+              <SectionHead><span style={{width:3,height:13,borderRadius:2,background:"#7e22ce"}}/>납품 <span style={{fontSize:12,color:"#94a3b8",fontWeight:500}}>{deliverGroups.length}개교 · {sev.d.length}동</span></SectionHead>
+              {deliverGroups.map(g=><SchoolCard key={"d_"+g.학교명} g={g} color="#7e22ce" type="deliver"/>)}
+            </div>}
+          </>;
+        })()}
 
         {/* 메모 입력 */}
         {sel&&<div style={{marginTop:14,paddingTop:14,borderTop:"1px dashed #e2e8f0"}}>
