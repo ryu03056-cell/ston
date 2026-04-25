@@ -2472,8 +2472,9 @@ const FLOORS = [
 ];
 
 // ── DiceBear URL 생성 ──
-const buildAvatarUrl = (data, opts = {}) => {
-  const seed = (opts.seed || data?.charSeed || data?.name || "user")+"";
+// name 인자를 명시적으로 받아 seed로 사용 (userData에 name 필드가 없을 수 있음)
+const buildAvatarUrl = (data, name, opts = {}) => {
+  const seed = (opts.seed || data?.charSeed || name || "user")+"";
   const params = new URLSearchParams();
   params.set("seed", seed);
   if(data?.skinColor)      params.set("skinColor", data.skinColor);
@@ -2482,7 +2483,6 @@ const buildAvatarUrl = (data, opts = {}) => {
   if(data?.eyes)           params.set("eyes", data.eyes);
   if(data?.facialHair && data.facialHair!=="none") params.set("facialHair", data.facialHair);
   if(data?.clothingColor)  params.set("clothingColor", data.clothingColor);
-  // 배경 투명 (방에 올릴 때)
   if(opts.transparentBg) params.set("backgroundColor", "transparent");
   return `https://api.dicebear.com/9.x/personas/svg?${params.toString()}`;
 };
@@ -2499,41 +2499,90 @@ function AvatarDisplay({name, data, size=40, isAdmin=false, transparentBg=false}
     );
   }
   return(
-    <img src={buildAvatarUrl({...d,name},{transparentBg})} alt={name}
+    <img src={buildAvatarUrl(d, name, {transparentBg})} alt={name}
       style={{width:size,height:size,borderRadius:transparentBg?0:"50%",background:transparentBg?"transparent":"#f1f5f9",border:transparentBg?"none":"2px solid #fff",boxShadow:transparentBg?"none":"0 1px 3px rgba(0,0,0,0.15)",flexShrink:0,objectFit:"contain"}}/>
   );
 }
 
 // ── 작은 방 표시 ──
-function MiniRoom({userData, ownerName}) {
+function MiniRoom({userData, ownerName, editable=false, onMove, onRemoveItem}) {
   const wp = WALLPAPERS.find(w=>w.id===(userData?.wallpaper||"cream"))||WALLPAPERS[0];
   const fl = FLOORS.find(f=>f.id===(userData?.floor||"wood"))||FLOORS[0];
   const placedItems = userData?.roomItems || []; // [{itemId, x, y}]
+  const roomRef = useRef();
+  const [draggingIdx, setDraggingIdx] = useState(null);
+
+  // 드래그 핸들러 (마우스 + 터치 통합)
+  const getEventPos = (e) => {
+    if(e.touches&&e.touches[0]) return {clientX:e.touches[0].clientX,clientY:e.touches[0].clientY};
+    if(e.changedTouches&&e.changedTouches[0]) return {clientX:e.changedTouches[0].clientX,clientY:e.changedTouches[0].clientY};
+    return {clientX:e.clientX,clientY:e.clientY};
+  };
+  const startDrag = (e, idx) => {
+    if(!editable) return;
+    e.preventDefault();
+    setDraggingIdx(idx);
+  };
+  const moveDrag = (e) => {
+    if(draggingIdx===null||!roomRef.current) return;
+    e.preventDefault();
+    const rect = roomRef.current.getBoundingClientRect();
+    const pos = getEventPos(e);
+    const x = ((pos.clientX-rect.left)/rect.width)*100;
+    const y = ((pos.clientY-rect.top)/rect.height)*100;
+    // 0~100 범위 제한
+    const cx = Math.max(5,Math.min(95,x));
+    const cy = Math.max(10,Math.min(95,y));
+    if(onMove) onMove(draggingIdx, cx, cy);
+  };
+  const endDrag = () => { setDraggingIdx(null); };
+
+  useEffect(()=>{
+    if(!editable) return;
+    const mm = (e)=>moveDrag(e);
+    const mu = ()=>endDrag();
+    window.addEventListener("mousemove", mm);
+    window.addEventListener("mouseup",   mu);
+    window.addEventListener("touchmove", mm, {passive:false});
+    window.addEventListener("touchend",  mu);
+    return ()=>{
+      window.removeEventListener("mousemove", mm);
+      window.removeEventListener("mouseup",   mu);
+      window.removeEventListener("touchmove", mm);
+      window.removeEventListener("touchend",  mu);
+    };
+  // eslint-disable-next-line
+  }, [editable, draggingIdx]);
 
   return(
-    <div style={{position:"relative",width:"100%",aspectRatio:"1/0.85",borderRadius:14,overflow:"hidden",border:"2px solid #e2e8f0",background:"#fff"}}>
-      {/* 벽 */}
+    <div ref={roomRef} style={{position:"relative",width:"100%",aspectRatio:"1/0.85",borderRadius:14,overflow:"hidden",border:"2px solid #e2e8f0",background:"#fff",userSelect:"none",touchAction:editable?"none":"auto"}}>
       <div style={{position:"absolute",top:0,left:0,right:0,height:"60%",background:wp.color}}/>
-      {/* 바닥 */}
       <div style={{position:"absolute",bottom:0,left:0,right:0,height:"40%",background:fl.color}}/>
-      {/* 창문 */}
       <div style={{position:"absolute",left:"8%",top:"10%",width:"22%",height:"28%",background:"linear-gradient(180deg,#bae6fd,#fef3c7)",border:"3px solid #92400e",borderRadius:4}}>
         <div style={{position:"absolute",left:"50%",top:0,bottom:0,width:2,background:"#92400e",transform:"translateX(-50%)"}}/>
         <div style={{position:"absolute",top:"50%",left:0,right:0,height:2,background:"#92400e",transform:"translateY(-50%)"}}/>
       </div>
-      {/* 캐릭터 */}
-      <img src={buildAvatarUrl({...userData,name:ownerName},{transparentBg:true})} alt={ownerName}
+      <img src={buildAvatarUrl(userData, ownerName, {transparentBg:true})} alt={ownerName}
         style={{position:"absolute",left:"50%",bottom:"15%",transform:"translateX(-50%)",width:"38%",height:"auto",pointerEvents:"none"}}/>
-      {/* 배치된 가구 */}
       {placedItems.map((p,i)=>{
         const item = FURNITURE.find(f=>f.id===p.itemId);
         if(!item) return null;
+        const isDragging = draggingIdx===i;
         return(
-          <div key={i} style={{position:"absolute",left:`${p.x}%`,top:`${p.y}%`,fontSize:30,lineHeight:1,transform:"translate(-50%,-50%)",pointerEvents:"none"}}>
+          <div key={i}
+            onMouseDown={e=>startDrag(e,i)}
+            onTouchStart={e=>startDrag(e,i)}
+            onClick={e=>{ if(editable&&onRemoveItem){ e.stopPropagation(); /* 일반 클릭 무시 — 드래그가 메인 */ } }}
+            style={{position:"absolute",left:`${p.x}%`,top:`${p.y}%`,fontSize:32,lineHeight:1,transform:"translate(-50%,-50%)",cursor:editable?"grab":"default",zIndex:isDragging?10:1,filter:isDragging?"drop-shadow(0 4px 8px rgba(0,0,0,0.3))":"none",transition:isDragging?"none":"filter 0.15s",touchAction:"none"}}>
             {item.emoji}
           </div>
         );
       })}
+      {editable && placedItems.length>0 &&
+        <div style={{position:"absolute",bottom:6,left:6,right:6,fontSize:10.5,color:"#64748b",background:"rgba(255,255,255,0.9)",borderRadius:6,padding:"4px 8px",textAlign:"center",fontWeight:600}}>
+          가구를 드래그해서 옮겨보세요
+        </div>
+      }
       {placedItems.length===0&&!userData?.charSeed&&!userData?.hair&&
         <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8",fontSize:13,fontWeight:600,background:"rgba(255,255,255,0.6)"}}>아직 빈 방이에요</div>}
     </div>
@@ -2544,7 +2593,7 @@ function MiniRoom({userData, ownerName}) {
 function CharPreview({userData, name, size=160}) {
   return(
     <div style={{width:size,height:size,borderRadius:"50%",background:"#f1f5f9",overflow:"hidden",border:"3px solid #fff",boxShadow:"0 4px 12px rgba(0,0,0,0.1)",flexShrink:0}}>
-      <img src={buildAvatarUrl({...userData,name})} alt={name} style={{width:"100%",height:"100%"}}/>
+      <img src={buildAvatarUrl(userData, name)} alt={name} style={{width:"100%",height:"100%"}}/>
     </div>
   );
 }
@@ -2598,8 +2647,20 @@ function MyPage({targetName, isOwn, userData, rows, addPoints}) {
       [ownedKey]: [...ownedList, item.id],
     });
   };
-  const equipItem = (id, fieldKey) => { if(isOwn) update({[fieldKey]: id}); };
-  const unequip = (fieldKey) => { if(isOwn) update({[fieldKey]: null}); };
+  const equipItem = (id, fieldKey) => {
+    if(!isOwn) return;
+    // Firebase는 null을 보내면 필드를 삭제하는데, 그게 의도. 단 정의 안된 거 보내지 않게.
+    if(id===null||id===undefined){
+      // 삭제
+      db.ref(`users/${targetName}/${fieldKey}`).remove();
+    } else {
+      update({[fieldKey]: id});
+    }
+  };
+  const unequip = (fieldKey) => {
+    if(!isOwn) return;
+    db.ref(`users/${targetName}/${fieldKey}`).remove();
+  };
   const setSkin = (id) => { if(isOwn){ update({skinColor: id}); setSkinPickerOpen(false); } };
   const saveStatus = () => {
     if(!isOwn) return;
@@ -2613,9 +2674,10 @@ function MyPage({targetName, isOwn, userData, rows, addPoints}) {
     const cur = userData.roomItems || [];
     if(cur.length>=12){ alert("방이 가득 찼어요 (최대 12개)"); return; }
     if(cur.some(p=>p.itemId===itemId)){ alert("이미 방에 있어요"); return; }
-    // 랜덤 위치
-    const x = 25 + Math.random()*50;
-    const y = 50 + Math.random()*30;
+    // 새 가구는 방 아래쪽에 살짝 분산되게 배치 (그 후 사용자가 드래그)
+    const idx = cur.length;
+    const x = 30 + (idx%4)*15; // 30, 45, 60, 75 반복
+    const y = 70 + (Math.floor(idx/4))*8;
     update({roomItems: [...cur, {itemId, x, y}]});
   };
   const removeFromRoom = (itemId) => {
@@ -2715,15 +2777,15 @@ function MyPage({targetName, isOwn, userData, rows, addPoints}) {
         </div>
 
         {/* 머리 스타일 */}
-        <WearGroup title="💇 머리" items={HAIR_STYLES} ownedIds={owned.hair} equippedId={equipped.hair} onEquip={id=>equipItem(id,"hair")} userData={userData} previewKey="hair" renderPreview={i=>i.label}/>
+        <WearGroup title="💇 머리" items={HAIR_STYLES} ownedIds={owned.hair} equippedId={equipped.hair} onEquip={id=>equipItem(id,"hair")} userData={userData} targetName={targetName} previewKey="hair" renderPreview={i=>i.label}/>
         {/* 머리 색 */}
-        <WearGroup title="🎨 머리색" items={HAIR_COLORS} ownedIds={owned.hairColor} equippedId={equipped.hairColor} onEquip={id=>equipItem(id,"hairColor")} userData={userData} previewKey="hairColor" renderPreview={i=>(<span style={{width:24,height:24,borderRadius:"50%",background:i.color,display:"inline-block",border:"1px solid #e2e8f0"}}/>)}/>
+        <WearGroup title="🎨 머리색" items={HAIR_COLORS} ownedIds={owned.hairColor} equippedId={equipped.hairColor} onEquip={id=>equipItem(id,"hairColor")} userData={userData} targetName={targetName} previewKey="hairColor" renderPreview={i=>(<span style={{width:24,height:24,borderRadius:"50%",background:i.color,display:"inline-block",border:"1px solid #e2e8f0"}}/>)}/>
         {/* 옷 색 */}
         <WearGroup title="👔 옷" items={[{id:"none",label:"기본",color:null,price:0},...CLOTHING_COLORS]} ownedIds={["none",...owned.clothing]} equippedId={equipped.clothingColor||"none"} onEquip={id=>equipItem(id==="none"?null:id,"clothingColor")} renderPreview={i=>i.color?<span style={{width:24,height:24,borderRadius:6,background:i.color,display:"inline-block",border:"1px solid #e2e8f0"}}/>:i.label}/>
         {/* 눈 / 안경 */}
-        <WearGroup title="👀 눈/안경" items={EYE_OPTIONS} ownedIds={owned.eyes} equippedId={equipped.eyes} onEquip={id=>equipItem(id,"eyes")} userData={userData} previewKey="eyes" renderPreview={i=>i.label}/>
+        <WearGroup title="👀 눈/안경" items={EYE_OPTIONS} ownedIds={owned.eyes} equippedId={equipped.eyes} onEquip={id=>equipItem(id,"eyes")} userData={userData} targetName={targetName} previewKey="eyes" renderPreview={i=>i.label}/>
         {/* 수염 */}
-        <WearGroup title="🧔 수염" items={FACIAL_HAIR} ownedIds={owned.facialHair} equippedId={equipped.facialHair} onEquip={id=>equipItem(id,"facialHair")} userData={userData} previewKey="facialHair" renderPreview={i=>i.label}/>
+        <WearGroup title="🧔 수염" items={FACIAL_HAIR} ownedIds={owned.facialHair} equippedId={equipped.facialHair} onEquip={id=>equipItem(id,"facialHair")} userData={userData} targetName={targetName} previewKey="facialHair" renderPreview={i=>i.label}/>
       </div>}
 
       {/* 상점 */}
@@ -2744,16 +2806,21 @@ function MyPage({targetName, isOwn, userData, rows, addPoints}) {
         </div>
         <div style={{background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
           <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>현재 보유 <strong style={{color:"#fbbf24"}}>🪙 {points}p</strong></div>
-          <ShopList cat={shopCat} userData={userData} owned={owned} buyItem={buyItem} points={points}/>
+          <ShopList cat={shopCat} userData={userData} owned={owned} buyItem={buyItem} points={points} targetName={targetName}/>
         </div>
       </div>}
 
       {/* 방 탭 */}
       {isOwn&&tab==="room"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
         <div style={{background:"#fff",borderRadius:12,padding:14,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:10}}>🏡 내 방</div>
-          <MiniRoom userData={userData} ownerName={targetName}/>
-          <div style={{fontSize:11,color:"#94a3b8",marginTop:8}}>최대 12개 가구 배치 가능</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:10}}>🏡 내 방 <span style={{fontSize:11,color:"#94a3b8",fontWeight:500,marginLeft:6}}>가구를 끌어서 옮기세요</span></div>
+          <MiniRoom userData={userData} ownerName={targetName} editable
+            onMove={(idx,x,y)=>{
+              const cur = userData.roomItems || [];
+              const next = cur.map((p,i)=>i===idx?{...p,x,y}:p);
+              update({roomItems: next});
+            }}/>
+          <div style={{fontSize:11,color:"#94a3b8",marginTop:8}}>최대 12개 가구 배치 가능 · 가구 카드의 "방에서 빼기"로 제거</div>
         </div>
         {/* 벽지 / 바닥 변경 */}
         <div style={{background:"#fff",borderRadius:12,padding:14,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
@@ -2803,13 +2870,13 @@ function MyPage({targetName, isOwn, userData, rows, addPoints}) {
 }
 
 // 꾸미기 탭의 한 그룹
-function WearGroup({title, items, ownedIds, equippedId, onEquip, renderPreview, userData, previewKey}) {
+function WearGroup({title, items, ownedIds, equippedId, onEquip, renderPreview, userData, previewKey, targetName}) {
   // 캐릭터 미리보기 URL 빌더
   const buildPreviewUrl = (item) => {
     if(!previewKey) return null;
     const previewData = {...userData};
     previewData[previewKey] = item.id;
-    return buildAvatarUrl({...previewData, name:userData.name||"preview"});
+    return buildAvatarUrl(previewData, targetName||"preview");
   };
   return(
     <div style={{background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
@@ -2838,7 +2905,7 @@ function WearGroup({title, items, ownedIds, equippedId, onEquip, renderPreview, 
 }
 
 // 상점 카테고리별 아이템 표시
-function ShopList({cat, userData, owned, buyItem, points}) {
+function ShopList({cat, userData, owned, buyItem, points, targetName}) {
   const catalog = {
     hair:       {items:HAIR_STYLES,    ownedKey:"hair",       previewType:"char",  previewKey:"hair"},
     hairColor:  {items:HAIR_COLORS,    ownedKey:"hairColor",  previewType:"char",  previewKey:"hairColor"},
@@ -2850,14 +2917,13 @@ function ShopList({cat, userData, owned, buyItem, points}) {
   }[cat];
   if(!catalog) return null;
 
-  // 미리보기용: 현재 사용자의 기본 모습에 해당 옵션만 바꿔서 보여줌
   const buildPreviewUrl = (item) => {
     const previewData = {...userData};
     if(catalog.previewKey==="hair"){ previewData.hair = item.id; }
     else if(catalog.previewKey==="hairColor"){ previewData.hairColor = item.id; }
     else if(catalog.previewKey==="eyes"){ previewData.eyes = item.id; }
     else if(catalog.previewKey==="facialHair"){ previewData.facialHair = item.id; }
-    return buildAvatarUrl({...previewData,name:userData.name||"preview"});
+    return buildAvatarUrl(previewData, targetName||"preview");
   };
 
   return(
