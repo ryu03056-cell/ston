@@ -282,7 +282,7 @@ function Login({onLogin,adminPw,members}) {
 /* ══════════════════════════════════════
    현장 관리 (수정·삭제·엑셀출력 포함)
 ══════════════════════════════════════ */
-function SiteManager({rows,setRows,members,isAdmin}) {
+function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
   const fileRef=useRef();
   const [search,  setSearch] =useState("");
   const [preview, setPreview]=useState(null);
@@ -413,7 +413,8 @@ function SiteManager({rows,setRows,members,isAdmin}) {
     };
     update([...rows,newRow]);
     setAddOpen(false); setAddF({});
-    showToast(`✅ ${newRow.학교명} 추가됐습니다`);
+    if(addPoints && userName) addPoints(userName, 20, "신규 현장 등록");
+    showToast(`✅ ${newRow.학교명} 추가됐습니다 (🪙 +20p)`);
   };
 
   /* 📤 엑셀 파싱 — 에러 처리 강화 */
@@ -1129,7 +1130,7 @@ function SiteManager({rows,setRows,members,isAdmin}) {
 /* ══════════════════════════════════════
    긴급 보고서
 ══════════════════════════════════════ */
-function UrgentReport({rows,setRows}) {
+function UrgentReport({rows,setRows,addPoints,userName}) {
   const [showDone, setShowDone]=useState(false);
   const [expSch,setExpSch]=useState(new Set());
   const togSch=n=>setExpSch(s=>{const n2=new Set(s);n2.has(n)?n2.delete(n):n2.add(n);return n2;});
@@ -1141,11 +1142,18 @@ function UrgentReport({rows,setRows}) {
   const completed=rows.filter(r=>r.progress===6);
 
   const updProg=(id,step)=>{
+    const target = rows.find(r=>r.id===id);
+    const oldStep = target?.progress || 0;
     const autoStatus=step===0?"예정":step===6?"완료":"진행중";
     const u=rows.map(r=>r.id===id?{...r,progress:step,status:autoStatus}:r);
     setRows(u);fbRows(u);
-    if(step===6){setShowDone(true);showToast("✅ 완료보고서 탭으로 이동했어요");}
+    // 🪙 단계 변경 (오른쪽으로 진행한 경우만)
+    if(addPoints && userName && step > oldStep){
+      addPoints(userName, 10, "현장 진행단계 변경");
+    }
+    if(step===6){setShowDone(true);showToast("✅ 완료보고서 탭으로 이동했어요 (🪙 +10p)");}
     else if(step===5&&showDone){setShowDone(false);showToast("↩ 긴급보고서 탭으로 되돌렸어요");}
+    else if(step > oldStep){showToast("🪙 +10p 적립됐어요");}
   };
   const updField=(id,field,value)=>{
     const u=rows.map(r=>r.id===id?{...r,[field]:value}:r);
@@ -1320,7 +1328,7 @@ function UrgentReport({rows,setRows}) {
 /* ══════════════════════════════════════
    일정 관리 (캘린더)
 ══════════════════════════════════════ */
-function Calendar({rows}) {
+function Calendar({rows,addPoints,userName}) {
   const [yr,setYr]=useState(TODAY.getFullYear());
   const [mo,setMo]=useState(TODAY.getMonth());
   // ✅ 오늘 자동 선택
@@ -1351,9 +1359,15 @@ function Calendar({rows}) {
     clearTimeout(noteSaveTimer.current);
     noteSaveTimer.current=setTimeout(()=>{
       if(!selKey)return;
+      const wasEmpty = !(notes[selKey]&&notes[selKey].length>=10);
+      const isNowQualified = val.trim().length>=10;
       if(val.trim()) db.ref(`calNotes/${selKey}`).set(val.trim());
       else db.ref(`calNotes/${selKey}`).remove();
       setNotes(n=>({...n,[selKey]:val.trim()}));
+      // 🪙 처음 10자 이상 쓸 때만 +3p (수정엔 점수 없음)
+      if(wasEmpty && isNowQualified && addPoints && userName){
+        addPoints(userName, 3, "일정 메모 작성");
+      }
     },1000);
   };
 
@@ -2327,12 +2341,245 @@ function Overview({rows,total,done,urgCnt,delayed}) {
   </>;
 }
 
+/* ══════════════════════════════════════
+   🎨 아바타 / 내 공간
+══════════════════════════════════════ */
+// 꾸미기 아이템 카탈로그
+const AVATAR_BG_ITEMS = [
+  {id:"bg_blue",   label:"파랑",   color:"#1d4ed8", price:20},
+  {id:"bg_red",    label:"빨강",   color:"#dc2626", price:20},
+  {id:"bg_green",  label:"초록",   color:"#16a34a", price:20},
+  {id:"bg_purple", label:"보라",   color:"#7e22ce", price:20},
+  {id:"bg_orange", label:"주황",   color:"#ea580c", price:20},
+  {id:"bg_pink",   label:"분홍",   color:"#db2777", price:20},
+  {id:"bg_cyan",   label:"민트",   color:"#0891b2", price:30},
+  {id:"bg_gold",   label:"골드",   color:"#ca8a04", price:50},
+  {id:"bg_grad1",  label:"노을",   color:"linear-gradient(135deg,#f97316,#dc2626)", price:80},
+  {id:"bg_grad2",  label:"바다",   color:"linear-gradient(135deg,#0ea5e9,#7e22ce)", price:80},
+  {id:"bg_grad3",  label:"숲",     color:"linear-gradient(135deg,#16a34a,#0891b2)", price:80},
+  {id:"bg_grad4",  label:"우주",   color:"linear-gradient(135deg,#1e1b4b,#7e22ce)", price:100},
+];
+const AVATAR_FRAME_ITEMS = [
+  {id:"fr_none",   label:"없음",   emoji:"",   price:0},
+  {id:"fr_flower", label:"꽃",     emoji:"🌸", price:30},
+  {id:"fr_star",   label:"별",     emoji:"⭐", price:30},
+  {id:"fr_fire",   label:"불",     emoji:"🔥", price:30},
+  {id:"fr_wave",   label:"파도",   emoji:"🌊", price:30},
+  {id:"fr_tree",   label:"나무",   emoji:"🌳", price:30},
+  {id:"fr_clover", label:"클로버", emoji:"🍀", price:40},
+  {id:"fr_bolt",   label:"번개",   emoji:"⚡", price:40},
+  {id:"fr_gem",    label:"보석",   emoji:"💎", price:60},
+];
+
+// 아바타 표시 (배경, 프레임 적용)
+function AvatarDisplay({name, data, size=40, isAdmin=false}) {
+  const d = data || {};
+  const bgItem = AVATAR_BG_ITEMS.find(i=>i.id===d.equippedBg);
+  const frameItem = AVATAR_FRAME_ITEMS.find(i=>i.id===d.equippedFrame);
+  const bgStyle = bgItem ? bgItem.color : (isAdmin?"#f97316":(MC[name]||"#1d4ed8"));
+  return(
+    <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
+      <div style={{
+        width:size,height:size,borderRadius:"50%",
+        background:bgStyle,
+        color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",
+        fontSize:size*0.42,fontWeight:700,
+        border:"2px solid #fff",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"
+      }}>{name?name[0]:"?"}</div>
+      {frameItem&&frameItem.emoji&&
+        <span style={{position:"absolute",bottom:-2,right:-2,fontSize:size*0.4,filter:"drop-shadow(0 1px 2px rgba(0,0,0,0.3))",lineHeight:1}}>{frameItem.emoji}</span>}
+    </div>
+  );
+}
+
+function MyPage({targetName, isOwn, userData, rows, addPoints}) {
+  const [tab,setTab] = useState("home"); // home | shop
+  const [shopCat,setShopCat] = useState("bg"); // bg | frame
+  const [statusInput,setStatusInput] = useState(userData.statusMsg||"");
+  const [savedMsg,setSavedMsg] = useState("");
+  useEffect(()=>{ setStatusInput(userData.statusMsg||""); },[targetName,userData.statusMsg]);
+
+  const points = userData.points||0;
+  const ownedBg = userData.ownedBg || [];
+  const ownedFrame = userData.ownedFrame || ["fr_none"]; // 기본은 "없음" 보유
+  const equippedBg = userData.equippedBg || null;
+  const equippedFrame = userData.equippedFrame || "fr_none";
+  const attendStreak = userData.attendStreak || 0;
+
+  // 내 통계 계산
+  const myRows = rows.filter(r=>r.lead===targetName);
+  const myDone = myRows.filter(r=>r.progress===6).length;
+  const myInProg = myRows.filter(r=>r.progress<6).length;
+
+  const buyItem = (item, cat) => {
+    if(!isOwn) return;
+    if(points < item.price){ alert("포인트가 부족해요"); return; }
+    const ownedKey = cat==="bg" ? "ownedBg" : "ownedFrame";
+    const owned = userData[ownedKey] || [];
+    if(owned.includes(item.id)){ alert("이미 구매한 아이템이에요"); return; }
+    if(!confirm(`${item.label} 아이템을 ${item.price}p에 구매하시겠어요?\n현재 ${points}p → ${points-item.price}p`)) return;
+    db.ref(`users/${targetName}`).update({
+      points: points - item.price,
+      [ownedKey]: [...owned, item.id],
+    });
+  };
+  const equipItem = (id, cat) => {
+    if(!isOwn) return;
+    const key = cat==="bg" ? "equippedBg" : "equippedFrame";
+    db.ref(`users/${targetName}`).update({[key]: id});
+  };
+  const unequipBg = () => {
+    if(!isOwn) return;
+    db.ref(`users/${targetName}`).update({equippedBg: null});
+  };
+  const saveStatus = () => {
+    if(!isOwn) return;
+    db.ref(`users/${targetName}`).update({statusMsg: statusInput.trim().slice(0,40)});
+    setSavedMsg("저장됐어요");
+    setTimeout(()=>setSavedMsg(""),1500);
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* 프로필 헤더 카드 */}
+      <div style={{background:"linear-gradient(135deg,#1e293b,#0f172a)",borderRadius:14,padding:"22px 20px",color:"#fff",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+        <AvatarDisplay name={targetName} data={userData} size={72}/>
+        <div style={{flex:1,minWidth:200}}>
+          <div style={{fontSize:20,fontWeight:800,marginBottom:4}}>{targetName}{isOwn&&<span style={{fontSize:12,color:"#94a3b8",marginLeft:8,fontWeight:500}}>· 내 공간</span>}</div>
+          {userData.statusMsg && !isOwn &&
+            <div style={{fontSize:13,color:"#cbd5e1",marginBottom:8}}>💬 {userData.statusMsg}</div>}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <span style={{background:"rgba(251,191,36,0.2)",color:"#fbbf24",fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:14}}>🪙 {points}p</span>
+            {attendStreak>0&&<span style={{background:"rgba(34,197,94,0.2)",color:"#4ade80",fontSize:12,fontWeight:700,padding:"4px 10px",borderRadius:14}}>🔥 {attendStreak}일 연속 출석</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* 본인일 때만 탭 */}
+      {isOwn && <div style={{display:"flex",background:"#fff",borderRadius:12,padding:4,border:"1px solid #e2e8f0"}}>
+        <button onClick={()=>setTab("home")}
+          style={{flex:1,padding:"10px",fontSize:13.5,fontWeight:600,border:"none",borderRadius:9,cursor:"pointer",fontFamily:"inherit",background:tab==="home"?"#0f172a":"transparent",color:tab==="home"?"#fff":"#94a3b8"}}>🏠 홈</button>
+        <button onClick={()=>setTab("shop")}
+          style={{flex:1,padding:"10px",fontSize:13.5,fontWeight:600,border:"none",borderRadius:9,cursor:"pointer",fontFamily:"inherit",background:tab==="shop"?"#0f172a":"transparent",color:tab==="shop"?"#fff":"#94a3b8"}}>🛍 상점</button>
+      </div>}
+
+      {(!isOwn||tab==="home")&&<>
+        {/* 상태 메시지 (본인만 편집) */}
+        {isOwn&&<div style={{background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:8}}>💬 한 줄 상태 (40자)</div>
+          <div style={{display:"flex",gap:8}}>
+            <input value={statusInput} onChange={e=>setStatusInput(e.target.value.slice(0,40))} placeholder="오늘 시흥 현장 화이팅!"
+              style={{flex:1,border:"1px solid #e2e8f0",borderRadius:10,padding:"10px 12px",fontSize:13.5,outline:"none",fontFamily:"inherit"}}/>
+            <button onClick={saveStatus} style={{padding:"10px 16px",borderRadius:10,border:"none",background:"#1d4ed8",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>저장</button>
+          </div>
+          {savedMsg&&<div style={{fontSize:11,color:"#16a34a",marginTop:6,fontWeight:600}}>✅ {savedMsg}</div>}
+        </div>}
+
+        {/* 보유 아이템 — 본인일 때만 장착/해제 가능 */}
+        {isOwn&&<div style={{background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:10}}>🎨 보유 아이템</div>
+          <div style={{fontSize:11.5,color:"#64748b",marginBottom:10,fontWeight:600}}>배경</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+            <button onClick={unequipBg} style={{padding:"8px 12px",borderRadius:10,border:`1.5px solid ${!equippedBg?"#1d4ed8":"#e2e8f0"}`,background:!equippedBg?"#eff6ff":"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>기본</button>
+            {AVATAR_BG_ITEMS.filter(i=>ownedBg.includes(i.id)).map(i=>(
+              <button key={i.id} onClick={()=>equipItem(i.id,"bg")}
+                style={{padding:"6px",borderRadius:10,border:`1.5px solid ${equippedBg===i.id?"#1d4ed8":"#e2e8f0"}`,background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
+                <span style={{width:22,height:22,borderRadius:"50%",background:i.color,display:"inline-block"}}/>
+                <span style={{fontSize:11.5,color:"#475569",fontWeight:600,paddingRight:6}}>{i.label}</span>
+              </button>
+            ))}
+            {ownedBg.length===0&&<span style={{fontSize:12,color:"#94a3b8",alignSelf:"center"}}>상점에서 구매하세요</span>}
+          </div>
+          <div style={{fontSize:11.5,color:"#64748b",marginBottom:10,fontWeight:600}}>프레임</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {AVATAR_FRAME_ITEMS.filter(i=>ownedFrame.includes(i.id)).map(i=>(
+              <button key={i.id} onClick={()=>equipItem(i.id,"frame")}
+                style={{padding:"6px 10px",borderRadius:10,border:`1.5px solid ${equippedFrame===i.id?"#1d4ed8":"#e2e8f0"}`,background:"#fff",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
+                <span style={{fontSize:14}}>{i.emoji||"⚪"}</span>
+                <span style={{fontSize:11.5,color:"#475569",fontWeight:600}}>{i.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>}
+
+        {/* 통계 */}
+        <div style={{background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0f172a",marginBottom:10}}>📊 {isOwn?"내":"이 사람"} 업무 현황</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 8px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#1d4ed8"}}>{myRows.length}</div>
+              <div style={{fontSize:11.5,color:"#475569",marginTop:4,fontWeight:600}}>담당 현장</div>
+            </div>
+            <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 8px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#16a34a"}}>{myDone}</div>
+              <div style={{fontSize:11.5,color:"#475569",marginTop:4,fontWeight:600}}>완료</div>
+            </div>
+            <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 8px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#f97316"}}>{myInProg}</div>
+              <div style={{fontSize:11.5,color:"#475569",marginTop:4,fontWeight:600}}>진행 중</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 본인일 때 포인트 적립 안내 */}
+        {isOwn&&<div style={{background:"#fffbeb",borderRadius:12,padding:14,border:"1px solid #fde68a"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#92400e",marginBottom:8}}>🪙 포인트 적립 방법</div>
+          <div style={{fontSize:12.5,color:"#78350f",lineHeight:1.7}}>
+            · 매일 첫 로그인 <strong>+5p</strong> (출석)<br/>
+            · 현장 진행단계 변경 <strong>+10p</strong><br/>
+            · 신규 현장 등록 <strong>+20p</strong><br/>
+            · 일정 메모 작성(10자 이상) <strong>+3p</strong>
+          </div>
+        </div>}
+      </>}
+
+      {isOwn&&tab==="shop"&&<>
+        <div style={{display:"flex",background:"#fff",borderRadius:12,padding:4,border:"1px solid #e2e8f0"}}>
+          <button onClick={()=>setShopCat("bg")} style={{flex:1,padding:"9px",fontSize:13,fontWeight:600,border:"none",borderRadius:9,cursor:"pointer",fontFamily:"inherit",background:shopCat==="bg"?"#1d4ed8":"transparent",color:shopCat==="bg"?"#fff":"#475569"}}>🎨 배경</button>
+          <button onClick={()=>setShopCat("frame")} style={{flex:1,padding:"9px",fontSize:13,fontWeight:600,border:"none",borderRadius:9,cursor:"pointer",fontFamily:"inherit",background:shopCat==="frame"?"#1d4ed8":"transparent",color:shopCat==="frame"?"#fff":"#475569"}}>✨ 프레임</button>
+        </div>
+
+        <div style={{background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+          <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>현재 보유 <strong style={{color:"#fbbf24"}}>🪙 {points}p</strong></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(110px,1fr))",gap:10}}>
+            {(shopCat==="bg"?AVATAR_BG_ITEMS:AVATAR_FRAME_ITEMS.filter(i=>i.id!=="fr_none")).map(item=>{
+              const ownedKey = shopCat==="bg" ? "ownedBg" : "ownedFrame";
+              const owned = (userData[ownedKey]||[]).includes(item.id);
+              const canAfford = points >= item.price;
+              return(
+                <div key={item.id} style={{background:"#f8fafc",borderRadius:10,padding:12,textAlign:"center",border:`1px solid ${owned?"#86efac":"#e2e8f0"}`}}>
+                  {shopCat==="bg" ? (
+                    <div style={{width:50,height:50,borderRadius:"50%",background:item.color,margin:"0 auto 8px",border:"2px solid #fff",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}/>
+                  ) : (
+                    <div style={{fontSize:36,marginBottom:6}}>{item.emoji}</div>
+                  )}
+                  <div style={{fontSize:12.5,fontWeight:700,color:"#0f172a",marginBottom:4}}>{item.label}</div>
+                  {owned ? (
+                    <div style={{fontSize:11,color:"#16a34a",fontWeight:700}}>✓ 보유 중</div>
+                  ) : (
+                    <button onClick={()=>buyItem(item,shopCat)} disabled={!canAfford}
+                      style={{width:"100%",padding:"6px",borderRadius:8,border:"none",background:canAfford?"#1d4ed8":"#cbd5e1",color:"#fff",fontSize:11.5,fontWeight:700,cursor:canAfford?"pointer":"not-allowed",fontFamily:"inherit"}}>
+                      🪙 {item.price}p
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>}
+    </div>
+  );
+}
+
 function App() {
   const [user,    setUser]    = useState(null);
   const [tab,     setTab]     = useState("전체 현황");
   const [rows,    setRows]    = useState([]);
   const [adminPw, setAdminPw] = useState(ADMIN_PW_DEFAULT);
   const [members, setMembers] = useState(DEFAULT_MEMBERS);
+  const [usersData, setUsersData] = useState({}); // 🪙 모든 팀원의 포인트/아바타 데이터
+  const [profileTarget, setProfileTarget] = useState(null); // 누구 프로필을 보고 있는지
 
   /* ✅ 수정: settings + rows 둘 다 로드된 후에만 ready=true */
   const [settLoaded, setSettLoaded] = useState(false);
@@ -2342,6 +2589,7 @@ function App() {
   useEffect(()=>{
     const settRef = db.ref("settings");
     const rowsRef = db.ref("rows");
+    const usersRef = db.ref("users"); // 🪙 사용자 데이터
 
     settRef.on("value", snap=>{
       const s=snap.val();
@@ -2349,7 +2597,7 @@ function App() {
         if(s.adminPw) setAdminPw(s.adminPw);
         if(s.members) setMembers(Array.isArray(s.members)?s.members:Object.values(s.members));
       }
-      setSettLoaded(true); // ← settings 로드 완료
+      setSettLoaded(true);
     });
 
     rowsRef.on("value", snap=>{
@@ -2385,13 +2633,69 @@ function App() {
         setRows(loaded);
       }
       else setRows([]);
-      setRowsLoaded(true); // ← rows 로드 완료
+      setRowsLoaded(true);
     });
 
-    return()=>{ settRef.off(); rowsRef.off(); };
+    usersRef.on("value", snap=>{
+      setUsersData(snap.val()||{});
+    });
+
+    return()=>{ settRef.off(); rowsRef.off(); usersRef.off(); };
   },[]);
 
   const isAdmin = user?.role==="admin";
+
+  // 🪙 포인트/아바타 헬퍼 ───────────────────────────────────
+  const todayKey = (()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+
+  // 포인트 적립 함수 (전역으로 사용)
+  const addPoints = (name, amount, reason) => {
+    if(!name || !amount) return;
+    const ref = db.ref(`users/${name}`);
+    ref.transaction(cur=>{
+      const c = cur||{};
+      return {
+        ...c,
+        points: (c.points||0) + amount,
+        lastReason: reason || c.lastReason || "",
+        lastEarnedAt: Date.now(),
+      };
+    });
+  };
+
+  // 출석 자동 체크 (로그인 + 그날 처음이면 +5p, 시작 보너스 100p)
+  useEffect(()=>{
+    if(!user || !ready) return;
+    const userRef = db.ref(`users/${user.name}`);
+    userRef.once("value", snap=>{
+      const data = snap.val() || {};
+      const updates = {};
+      // 신규 사용자: 시작 포인트 100p 1회 지급
+      if(!data.initialized){
+        updates.points = (data.points||0) + 100;
+        updates.initialized = true;
+        updates.joinedAt = Date.now();
+      }
+      // 오늘 출석 미체크면 +5p
+      if(data.lastAttendDate !== todayKey){
+        updates.points = (updates.points!==undefined?updates.points:(data.points||0)) + 5;
+        updates.lastAttendDate = todayKey;
+        updates.attendStreak = (data.lastAttendDate)?(()=>{
+          // 어제 출석했으면 streak +1, 아니면 1로 리셋
+          const y = new Date(); y.setDate(y.getDate()-1);
+          const yKey = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,"0")}-${String(y.getDate()).padStart(2,"0")}`;
+          return data.lastAttendDate===yKey ? (data.attendStreak||0)+1 : 1;
+        })():1;
+      }
+      if(Object.keys(updates).length > 0){
+        userRef.update(updates);
+      }
+    });
+  // eslint-disable-next-line
+  }, [user, ready]);
+
+  const myData = user ? (usersData[user.name] || {}) : {};
+  const myPoints = myData.points || 0;
 
   /* 사이드바 열림/닫힘 상태 (모바일에선 기본 닫힘) */
   const [sideOpen, setSideOpen] = useState(typeof window!=="undefined"&&window.innerWidth>=768);
@@ -2449,12 +2753,20 @@ function App() {
         <div style={{padding:"0 20px 18px",borderBottom:"1px solid #1e293b"}}>
           <div style={{fontSize:11,color:"#64748b",marginBottom:3}}>TEAM DASHBOARD</div>
           <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>현장조사팀</div>
-          <div style={{marginTop:8,display:"flex",alignItems:"center",gap:7}}>
-            <div style={{width:24,height:24,borderRadius:"50%",background:isAdmin?"#f97316":MC[user.name]||"#1d4ed8",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700}}>{user.name[0]}</div>
-            <div><div style={{fontSize:11,color:"#fff",fontWeight:600}}>{user.name}</div><div style={{fontSize:9,color:isAdmin?"#fb923c":"#22c55e"}}>{isAdmin?"🔐 관리자":"● 팀원"}</div></div>
+          {/* 본인 프로필 — 클릭하면 내 공간으로 */}
+          <div onClick={()=>{setProfileTarget(user.name);setTab("내 공간");if(isMobile)setSideOpen(false);}}
+            style={{marginTop:10,display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:10,background:tab==="내 공간"&&profileTarget===user.name?"#1e40af":"rgba(255,255,255,0.05)",cursor:"pointer",border:"1px solid rgba(255,255,255,0.08)"}}>
+            <AvatarDisplay name={user.name} data={myData} size={32} isAdmin={isAdmin}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,color:"#fff",fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user.name}</div>
+              <div style={{fontSize:10,color:isAdmin?"#fb923c":"#22c55e"}}>{isAdmin?"🔐 관리자":"● 팀원"}</div>
+            </div>
+            <div style={{background:"rgba(251,191,36,0.15)",color:"#fbbf24",fontSize:10.5,fontWeight:700,padding:"3px 8px",borderRadius:10,whiteSpace:"nowrap"}}>
+              🪙 {myPoints}
+            </div>
           </div>
         </div>
-        <div style={{padding:"12px 10px",flex:1}}>
+        <div style={{padding:"12px 10px",flex:1,overflowY:"auto"}}>
           {sideItems.map(item=>(
             <div key={item.label} onClick={()=>{setTab(item.label);if(isMobile)setSideOpen(false);}}
               style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,cursor:"pointer",marginBottom:3,
@@ -2466,6 +2778,24 @@ function App() {
               {item.adminOnly&&<span style={{marginLeft:"auto",fontSize:9,background:"rgba(249,115,22,.2)",color:"#fb923c",borderRadius:4,padding:"1px 5px"}}>관리자</span>}
             </div>
           ))}
+
+          {/* 팀원 목록 */}
+          <div style={{marginTop:18,paddingTop:14,borderTop:"1px solid #1e293b"}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,letterSpacing:0.5,padding:"0 12px 8px"}}>팀원</div>
+            {members.filter(m=>m!==user.name).map(m=>{
+              const md = usersData[m] || {};
+              return(
+                <div key={m} onClick={()=>{setProfileTarget(m);setTab("내 공간");if(isMobile)setSideOpen(false);}}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",borderRadius:10,cursor:"pointer",marginBottom:2,background:tab==="내 공간"&&profileTarget===m?"rgba(255,255,255,0.08)":"transparent"}}>
+                  <AvatarDisplay name={m} data={md} size={24}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,color:"#cbd5e1",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m}</div>
+                    {md.statusMsg&&<div style={{fontSize:9.5,color:"#64748b",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{md.statusMsg}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
         <div style={{padding:"12px 14px",borderTop:"1px solid #1e293b"}}>
           <button onClick={()=>{setUser(null);setTab("전체 현황");}} style={{width:"100%",padding:"7px",borderRadius:8,border:"1px solid #334155",background:"transparent",color:"#64748b",fontSize:12,cursor:"pointer"}}>로그아웃</button>
@@ -2494,12 +2824,13 @@ function App() {
 
         {tab==="전체 현황" && <Overview rows={rows} total={total} done={done} urgCnt={urgCnt} delayed={delayed}/>}
 
-        {tab==="일정 관리"   && <Calendar rows={rows}/>}
-        {tab==="긴급 보고서" && <UrgentReport rows={rows} setRows={setRows}/>}
-        {tab==="현장 관리"   && <SiteManager rows={rows} setRows={setRows} members={members} isAdmin={isAdmin}/>}
+        {tab==="일정 관리"   && <Calendar rows={rows} addPoints={addPoints} userName={user.name}/>}
+        {tab==="긴급 보고서" && <UrgentReport rows={rows} setRows={setRows} addPoints={addPoints} userName={user.name}/>}
+        {tab==="현장 관리"   && <SiteManager rows={rows} setRows={setRows} members={members} isAdmin={isAdmin} addPoints={addPoints} userName={user.name}/>}
         {tab==="팀 채팅"     && <Chat user={user} members={members}/>}
         {tab==="매출 현황"   && isAdmin && <Revenue rows={rows} setRows={setRows}/>}
         {tab==="설정"        && isAdmin && <Settings adminPw={adminPw} setAdminPw={setAdminPw} members={members} setMembers={setMembers}/>}
+        {tab==="내 공간"     && <MyPage targetName={profileTarget||user.name} isOwn={(profileTarget||user.name)===user.name} userData={usersData[profileTarget||user.name]||{}} rows={rows} addPoints={addPoints}/>}
       </div>
     </div>
   );
