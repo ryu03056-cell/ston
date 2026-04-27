@@ -311,20 +311,84 @@ const extractSchoolName = (raw) => {
   return m ? m[1] : null;
 };
 
-// 두 학교명이 같은지 (정확/확장 매칭)
+// 시도 1: 학교명 끝의 "초/중/고"를 정상화 ("...초"→"...초등학교")
+const expandSchoolSuffix = (name) => {
+  if(!name) return name;
+  if(name.endsWith("초")) return name + "등학교";
+  if(name.endsWith("중")) return name + "학교";
+  if(name.endsWith("고")) return name + "등학교";
+  return name;
+};
+
+// 학교명 정규화 — 지역 접두사 제거 ("시흥신일초"→"신일초")
+const stripRegionPrefix = (name) => {
+  if(!name) return name;
+  // 자주 나오는 지역 prefix들
+  const regions = ["서울","부산","대구","인천","광주","대전","울산","세종",
+    "수원","성남","고양","용인","화성","부천","남양주","안산","안양","평택","시흥","파주","의정부","김포","광명","광주",
+    "군포","오산","이천","양주","구리","안성","포천","의왕","하남","여주","동두천","과천","가평","연천","양평",
+    "춘천","원주","강릉","동해","태백","속초","삼척","홍천","횡성","영월","평창","정선","철원","화천","양구","인제","고성",
+    "청주","충주","제천","보은","옥천","영동","증평","진천","괴산","음성","단양",
+    "천안","공주","보령","아산","서산","논산","계룡","당진","금산","부여","서천","청양","홍성","예산","태안",
+    "전주","군산","익산","정읍","남원","김제","완주","진안","무주","장수","임실","순창","고창","부안",
+    "목포","여수","순천","나주","광양","담양","곡성","구례","고흥","보성","화순","장흥","강진","해남","영암","무안","함평","영광","장성","완도","진도","신안",
+    "포항","경주","김천","안동","구미","영주","영천","상주","문경","경산","군위","의성","청송","영양","영덕","청도","고령","성주","칠곡","예천","봉화","울진","울릉",
+    "창원","진주","통영","사천","김해","밀양","거제","양산","의령","함안","창녕","고성","남해","하동","산청","함양","거창","합천","제주","서귀포",
+    "양평","여주"];
+  for(const reg of regions){
+    if(name.startsWith(reg) && name.length>reg.length+1) return name.slice(reg.length);
+  }
+  return name;
+};
+
+// 두 학교명이 같은지 (정확/확장/지역접두사제거 매칭)
 const schoolMatches = (calName, mainName) => {
   if(!calName || !mainName) return false;
   if(calName === mainName) return true;
-  // "...초" → "...초등학교"
-  let expanded = calName;
-  if(calName.endsWith("초")) expanded = calName + "등학교";
-  else if(calName.endsWith("중")) expanded = calName + "학교";
-  else if(calName.endsWith("고")) expanded = calName + "등학교";
-  if(expanded === mainName) return true;
-  // 부분 포함
-  if(calName.length>=3 && mainName.includes(calName)) return true;
-  if(mainName.length>=3 && calName.includes(mainName)) return true;
+  // 정규화 시도들
+  const calExpanded = expandSchoolSuffix(calName);
+  const mainExpanded = expandSchoolSuffix(mainName);
+  const calStripped = stripRegionPrefix(calName);
+  const calStrippedExpanded = expandSchoolSuffix(calStripped);
+  const mainStripped = stripRegionPrefix(mainName);
+  
+  // 모든 조합 비교
+  const calVariants = [calName, calExpanded, calStripped, calStrippedExpanded];
+  const mainVariants = [mainName, mainExpanded, mainStripped];
+  for(const c of calVariants){
+    for(const m of mainVariants){
+      if(c && m && c===m) return true;
+    }
+  }
+  // 부분 포함 (긴 쪽이 짧은 쪽을 포함)
+  for(const c of calVariants){
+    for(const m of mainVariants){
+      if(!c || !m) continue;
+      if(c.length>=4 && m.includes(c)) return true;
+      if(m.length>=4 && c.includes(m)) return true;
+    }
+  }
   return false;
+};
+
+// 날짜 정규화 — 다양한 형식을 "YYYY-MM-DD"로 (사이트 데이터 vs 달력 데이터)
+const normalizeDateStr = (raw) => {
+  if(!raw) return "";
+  const s = String(raw).trim();
+  // "2026-04-01" 형식이면 그대로
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // "2026-04-01 00:00:00", "2026-04-01T00:00:00..." 등
+  const m1 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m1) return `${m1[1]}-${m1[2].padStart(2,"0")}-${m1[3].padStart(2,"0")}`;
+  // "2026/4/1"
+  const m2 = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if(m2) return `${m2[1]}-${m2[2].padStart(2,"0")}-${m2[3].padStart(2,"0")}`;
+  // datetime 객체가 string으로 캐스팅된 경우 ("Mon Apr 01 2026...")
+  const d = new Date(s);
+  if(!isNaN(d.getTime())){
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+  return s;
 };
 
 // 시트 이름이 "N월달력" 형식인지
@@ -619,6 +683,10 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
   // 🔄 달력 시트(4월달력/5월달력 등)에서 현장인원 자동 매칭
   const calFileRef = useRef();
   const [calPreview, setCalPreview] = useState(null);
+  // 우리 지역만 처리 (다른 팀 지역은 제외)
+  const OUR_REGIONS = ["과천","광주","군포","김포","부천","안산","안양","시흥","광명"];
+  // 박두환 같은 외부 인원이지만 표시는 하고 싶은 분
+  const EXTRA_CREW = ["박두환"];
   const handleCalFile = e => {
     const file = e.target.files[0];
     if(!file){ showToast("⚠️ 파일이 선택되지 않았어요","delete"); return; }
@@ -650,14 +718,31 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
         });
         // 현재 사이트 데이터(rows)와 매칭
         // rows의 학교 + 현장조사 날짜와, 달력의 학교 + 날짜 매칭
+        // ⭐ 우리팀 일정만 필터: "3팀" 글자 OR 핵심 멤버(members) 포함
+        // 박두환만 있는 경우는 우리팀 일정 아님 (다른팀 지원 케이스)
+        const coreMembers = new Set(members); // 사이트 등록된 팀원
         const matches = [];
         const unmatched = [];
+        const skippedNotOurs = [];
         unique.forEach(rec=>{
           const calSchoolName = extractSchoolName(rec.schoolRaw);
           if(!calSchoolName){ unmatched.push(rec); return; }
-          // rows에서 학교명 + 현장조사 날짜가 모두 일치하는 행 찾기
+          // 우리팀 일정 판정
+          const has3Team = (rec.schoolRaw.includes("3팀")) || (rec.peopleRaw.includes("3팀"));
+          const namesInPeople = rec.names || [];
+          const hasOurMember = namesInPeople.some(n=>coreMembers.has(n));
+          if(!has3Team && !hasOurMember){
+            skippedNotOurs.push(rec);
+            return;
+          }
+          // 박두환 같은 외부 인원도 인원 표시에 포함
+          const allCrew = namesInPeople.filter(n=>coreMembers.has(n) || EXTRA_CREW.includes(n));
+          // 사이트 매칭 (우리 지역만)
           const matchedRows = rows.filter(r=>{
-            if(r.현장조사 !== rec.date) return false;
+            // 우리 지역 필터
+            if(!OUR_REGIONS.includes(r.지역)) return false;
+            const rowDate = normalizeDateStr(r.현장조사);
+            if(rowDate !== rec.date) return false;
             return schoolMatches(calSchoolName, r.학교명);
           });
           if(matchedRows.length>0){
@@ -666,10 +751,11 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
                 rowId: mr.id,
                 school: mr.학교명,
                 date: rec.date,
-                names: rec.names,
+                names: allCrew,
                 facility: mr.시설명,
                 region: mr.지역,
                 calRaw: rec.schoolRaw,
+                tag: has3Team ? "3팀" : "멤버",
               });
             });
           } else {
@@ -681,9 +767,10 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
           matched: matches,
           unmatched: unmatched.slice(0,15),
           unmatchedCount: unmatched.length,
+          skippedCount: skippedNotOurs.length,
           sheetsFound: calSheets,
         });
-        showToast(`✅ ${matches.length}건 매칭 (전체 ${unique.length}건)`);
+        showToast(`✅ 우리팀 ${matches.length}건 매칭 (다른팀 ${skippedNotOurs.length}건 제외)`);
       } catch(err){
         console.error("달력 파싱 오류:", err);
         showToast(`❌ 파싱 오류: ${err.message}`,"delete");
@@ -830,11 +917,9 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
           <button onClick={()=>fileRef.current.click()}
             style={{padding:"7px 14px",borderRadius:8,border:"none",background:"#1d4ed8",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>📤 엑셀 업로드</button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
-          {isAdmin && <>
-            <button onClick={()=>calFileRef.current.click()}
-              style={{padding:"7px 14px",borderRadius:8,border:"1px solid #7c3aed",background:"#f5f3ff",color:"#7c3aed",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>📅 현장인원 동기화</button>
-            <input ref={calFileRef} type="file" accept=".xlsx,.xls" onChange={handleCalFile} style={{display:"none"}}/>
-          </>}
+          {isAdmin && <button onClick={()=>calFileRef.current.click()}
+            style={{padding:"7px 14px",borderRadius:8,border:"1px solid #7c3aed",background:"#f5f3ff",color:"#7c3aed",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>📅 현장인원 동기화</button>}
+          {isAdmin && <input ref={calFileRef} type="file" accept=".xlsx,.xls" onChange={handleCalFile} style={{display:"none"}}/>}
         </div>
       </div>
       <div style={{fontSize:12,color:"#64748b"}}>
@@ -1069,17 +1154,20 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
       {calPreview && <div onClick={()=>setCalPreview(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:60,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}>
         <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:14,padding:18,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
           <div style={{fontSize:16,fontWeight:800,marginBottom:6,color:"#0f172a"}}>📅 현장인원 동기화 미리보기</div>
-          <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>
-            {calPreview.sheetsFound.join(", ")} 시트 분석 · 총 일정 {calPreview.totalCalendar}건
+          <div style={{fontSize:12,color:"#64748b",marginBottom:14,lineHeight:1.5}}>
+            {calPreview.sheetsFound.join(", ")} 시트 분석 · 전체 일정 {calPreview.totalCalendar}건
+            {calPreview.skippedCount>0 && <> · 다른팀 일정 {calPreview.skippedCount}건 자동 제외</>}
+            <br/>
+            <span style={{color:"#7c3aed",fontWeight:600}}>우리 지역만: {OUR_REGIONS.join(" · ")}</span>
           </div>
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
             <div style={{background:"#f0fdf4",borderRadius:10,padding:"10px 12px",border:"1px solid #86efac"}}>
-              <div style={{fontSize:11,color:"#16a34a",fontWeight:600}}>매칭됨</div>
+              <div style={{fontSize:11,color:"#16a34a",fontWeight:600}}>우리팀 매칭됨</div>
               <div style={{fontSize:22,fontWeight:800,color:"#16a34a"}}>{calPreview.matched.length}</div>
             </div>
             <div style={{background:"#fef2f2",borderRadius:10,padding:"10px 12px",border:"1px solid #fca5a5"}}>
-              <div style={{fontSize:11,color:"#dc2626",fontWeight:600}}>매칭 실패</div>
+              <div style={{fontSize:11,color:"#dc2626",fontWeight:600}}>매칭 실패 (학교 X)</div>
               <div style={{fontSize:22,fontWeight:800,color:"#dc2626"}}>{calPreview.unmatchedCount}</div>
             </div>
           </div>
@@ -1089,8 +1177,9 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
             <div style={{maxHeight:240,overflowY:"auto",border:"1px solid #e2e8f0",borderRadius:10}}>
               {calPreview.matched.map((m,i)=>(
                 <div key={i} style={{padding:"9px 12px",borderBottom:i<calPreview.matched.length-1?"1px solid #f1f5f9":"none",fontSize:12.5}}>
-                  <div style={{display:"flex",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",gap:8,marginBottom:3,flexWrap:"wrap",alignItems:"center"}}>
                     <span style={{color:"#1d4ed8",fontWeight:700}}>{m.date}</span>
+                    {m.tag && <span style={{background:m.tag==="3팀"?"#dbeafe":"#f5f3ff",color:m.tag==="3팀"?"#1d4ed8":"#7c3aed",fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:6}}>{m.tag}</span>}
                     <span style={{fontWeight:700}}>{m.school}</span>
                     {m.facility && <span style={{color:"#64748b"}}>· {m.facility}</span>}
                   </div>
