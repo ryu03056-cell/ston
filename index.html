@@ -737,14 +737,28 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
           }
           // 박두환 같은 외부 인원도 인원 표시에 포함
           const allCrew = namesInPeople.filter(n=>coreMembers.has(n) || EXTRA_CREW.includes(n));
-          // 사이트 매칭 (우리 지역만)
-          const matchedRows = rows.filter(r=>{
-            // 우리 지역 필터
-            if(!OUR_REGIONS.includes(r.지역)) return false;
-            const rowDate = normalizeDateStr(r.현장조사);
-            if(rowDate !== rec.date) return false;
-            return schoolMatches(calSchoolName, r.학교명);
-          });
+          // ── 사이트 매칭 (3단계 fallback) ──
+          // 우리 지역 + 우리 학교만 후보
+          const candidateRows = rows.filter(r=>OUR_REGIONS.includes(r.지역) && schoolMatches(calSchoolName, r.학교명));
+          // 1단계: 정확한 날짜 매칭
+          let matchedRows = candidateRows.filter(r=>normalizeDateStr(r.현장조사) === rec.date);
+          let matchTag = "정확";
+          // 2단계: ±1일 허용 (엑셀 입력 오차 대응)
+          if(matchedRows.length===0){
+            const recD = new Date(rec.date);
+            matchedRows = candidateRows.filter(r=>{
+              const rd = normalizeDateStr(r.현장조사);
+              if(!rd) return false;
+              const diff = Math.abs((new Date(rd) - recD)/86400000);
+              return diff>=1 && diff<=1;
+            });
+            if(matchedRows.length>0) matchTag = "±1일";
+          }
+          // 3단계: 날짜 비어있어도 학교명만 일치하면 매칭 (사이트 데이터 부족 케이스)
+          if(matchedRows.length===0){
+            matchedRows = candidateRows.filter(r=>!r.현장조사 || normalizeDateStr(r.현장조사)==="");
+            if(matchedRows.length>0) matchTag = "날짜없음";
+          }
           if(matchedRows.length>0){
             matchedRows.forEach(mr=>{
               matches.push({
@@ -756,12 +770,37 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
                 region: mr.지역,
                 calRaw: rec.schoolRaw,
                 tag: has3Team ? "3팀" : "멤버",
+                matchTag: matchTag,
               });
             });
           } else {
-            unmatched.push(rec);
+            // 진단 정보 추가 — 왜 안 됐는지
+            const candidates = candidateRows.length;
+            let reason = "사이트에 학교 없음";
+            if(candidates>0){
+              reason = `학교는 있는데 날짜 다름 (사이트 날짜: ${candidateRows.map(r=>normalizeDateStr(r.현장조사)||"없음").join(", ")})`;
+            }
+            unmatched.push({...rec, reason});
           }
         });
+
+        // 🔍 진단 로그 — 콘솔에 출력
+        console.log("=== 현장인원 동기화 진단 ===");
+        console.log(`전체 일정: ${unique.length}건`);
+        console.log(`다른팀 제외: ${skippedNotOurs.length}건`);
+        console.log(`매칭 성공: ${matches.length}건`);
+        console.log(`매칭 실패: ${unmatched.length}건`);
+        console.log(`사이트 전체 행 수: ${rows.length}건`);
+        const ourRegionRows = rows.filter(r=>OUR_REGIONS.includes(r.지역));
+        console.log(`사이트 우리 지역 행: ${ourRegionRows.length}건`);
+        const withSurveyDate = ourRegionRows.filter(r=>r.현장조사 && normalizeDateStr(r.현장조사));
+        console.log(`사이트 우리 지역 + 현장조사 날짜 있음: ${withSurveyDate.length}건`);
+        if(withSurveyDate.length<10){
+          console.warn("⚠️ 사이트의 '현장조사' 날짜가 비어있는 행이 많습니다! 엑셀 재업로드 필요");
+        }
+        if(unmatched.length>0){
+          console.log("실패 샘플:", unmatched.slice(0,5).map(u=>`${u.date} ${u.schoolRaw.slice(0,20)} → ${u.reason}`));
+        }
         setCalPreview({
           totalCalendar: unique.length,
           matched: matches,
@@ -1180,6 +1219,7 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
                   <div style={{display:"flex",gap:8,marginBottom:3,flexWrap:"wrap",alignItems:"center"}}>
                     <span style={{color:"#1d4ed8",fontWeight:700}}>{m.date}</span>
                     {m.tag && <span style={{background:m.tag==="3팀"?"#dbeafe":"#f5f3ff",color:m.tag==="3팀"?"#1d4ed8":"#7c3aed",fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:6}}>{m.tag}</span>}
+                    {m.matchTag && m.matchTag!=="정확" && <span style={{background:"#fef3c7",color:"#92400e",fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:6}}>{m.matchTag}</span>}
                     <span style={{fontWeight:700}}>{m.school}</span>
                     {m.facility && <span style={{color:"#64748b"}}>· {m.facility}</span>}
                   </div>
@@ -1193,16 +1233,17 @@ function SiteManager({rows,setRows,members,isAdmin,addPoints,userName}) {
 
           {calPreview.unmatched.length>0 && <details style={{marginBottom:14}}>
             <summary style={{fontSize:13,fontWeight:600,color:"#dc2626",cursor:"pointer",padding:"6px 0"}}>❌ 매칭 실패 {calPreview.unmatchedCount}건 (펼치기)</summary>
-            <div style={{maxHeight:160,overflowY:"auto",border:"1px solid #fecaca",borderRadius:10,marginTop:6,background:"#fff5f5"}}>
+            <div style={{maxHeight:200,overflowY:"auto",border:"1px solid #fecaca",borderRadius:10,marginTop:6,background:"#fff5f5"}}>
               {calPreview.unmatched.map((u,i)=>(
                 <div key={i} style={{padding:"7px 10px",fontSize:11.5,color:"#7f1d1d",borderBottom:"1px solid #fee2e2"}}>
-                  <span style={{color:"#dc2626",fontWeight:600}}>{u.date}</span> · {u.schoolRaw.slice(0,55)}
+                  <div><span style={{color:"#dc2626",fontWeight:600}}>{u.date}</span> · {u.schoolRaw.slice(0,55)}</div>
+                  {u.reason && <div style={{fontSize:10.5,color:"#991b1b",marginTop:2,paddingLeft:8}}>↳ {u.reason}</div>}
                 </div>
               ))}
               {calPreview.unmatchedCount>15 && <div style={{padding:"7px 10px",fontSize:11,color:"#94a3b8",textAlign:"center"}}>... 외 {calPreview.unmatchedCount-15}건</div>}
             </div>
             <div style={{fontSize:11,color:"#94a3b8",marginTop:6,lineHeight:1.5}}>
-              💡 매칭 실패 이유: 메인 시트에 그 학교가 없거나, 현장조사 날짜가 일치하지 않음
+              💡 가장 흔한 원인: 사이트의 "현장조사" 날짜가 비어있거나 엑셀과 다름. F12 → Console 탭에서 더 자세한 진단 보기
             </div>
           </details>}
 
